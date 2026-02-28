@@ -1,0 +1,34 @@
+{
+  "name": "inistnt",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Inistnt — India ka Blue Collar Gig Platform",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "turbo dev --filter=web-customer",
+    "dev:admin": "turbo dev --filter=web-admin",
+    "dev:support": "turbo dev --filter=web-support",
+    "dev:api": "turbo dev --filter=api-gateway",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "clean": "turbo clean",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml}\"",
+    "docker:dev": "docker-compose -f infra/docker/docker-compose.dev.yml up -d",
+    "docker:down": "docker-compose -f infra/docker/docker-compose.dev.yml down",
+    "docker:logs": "docker-compose -f infra/docker/docker-compose.dev.yml logs -f",
+    "db:migrate": "turbo db:migrate --filter=api-gateway",
+    "db:studio": "pnpm --filter=api-gateway db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "prettier": "^3.2.0",
+    "rimraf": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
