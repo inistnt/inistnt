@@ -22,10 +22,10 @@
     "db:studio": "pnpm --filter=api-gateway db:studio"
   },
   "devDependencies": {
-    "turbo": "^2.0.0",
-    "typescript": "^5.4.0",
     "prettier": "^3.2.0",
-    "rimraf": "^5.0.0"
+    "rimraf": "^5.0.0",
+    "turbo": "^2.8.12",
+    "typescript": "^5.4.0"
   },
   "engines": {
     "node": ">=20.0.0",
