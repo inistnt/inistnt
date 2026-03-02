@@ -957,22 +957,43 @@ export type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;
 export type UpdateUserProfileInput = z.infer<typeof UpdateUserProfileSchema>;
 export type AddressInput = z.infer<typeof AddressSchema>;
 export type WorkerRegistrationInput = z.infer<typeof WorkerRegistrationSchema>;
+export type UpdateWorkerStatusInput = z.infer<typeof UpdateWorkerStatusSchema>;
 export type UpdateWorkerLocationInput = z.infer<typeof UpdateWorkerLocationSchema>;
+export type WorkerBankDetailsInput = z.infer<typeof WorkerBankDetailsSchema>;
+export type AddWorkerSkillInput = z.infer<typeof AddWorkerSkillSchema>;
+
 export type CreateBookingInput = z.infer<typeof CreateBookingSchema>;
 export type CancelBookingInput = z.infer<typeof CancelBookingSchema>;
 export type VerifyBookingOtpInput = z.infer<typeof VerifyBookingOtpSchema>;
+
 export type CreateReviewInput = z.infer<typeof CreateReviewSchema>;
+export type ReviewResponseInput = z.infer<typeof ReviewResponseSchema>;
+export type FlagReviewInput = z.infer<typeof FlagReviewSchema>;
+
 export type CreateDisputeInput = z.infer<typeof CreateDisputeSchema>;
 export type ResolveDisputeInput = z.infer<typeof ResolveDisputeSchema>;
+export type EscalateDisputeInput = z.infer<typeof EscalateDisputeSchema>;
+
 export type TriggerSosInput = z.infer<typeof TriggerSosSchema>;
 export type SendMessageInput = z.infer<typeof SendMessageSchema>;
+
+export type InitiatePaymentInput = z.infer<typeof InitiatePaymentSchema>;
+export type ApplyCouponInput = z.infer<typeof ApplyCouponSchema>;
+export type RequestPayoutInput = z.infer<typeof RequestPayoutSchema>;
+export type BuySubscriptionInput = z.infer<typeof BuySubscriptionSchema>;
+export type RedeemPointsInput = z.infer<typeof RedeemPointsSchema>;
+export type ClaimRewardInput = z.infer<typeof ClaimRewardSchema>;
+
 export type WorkerActionInput = z.infer<typeof WorkerActionSchema>;
 export type InviteStaffInput = z.infer<typeof InviteStaffSchema>;
-export type CreateBookingFiltersInput = z.infer<typeof BookingFiltersSchema>;
+
 export type ServiceSearchInput = z.infer<typeof ServiceSearchSchema>;
+export type FileUploadInput = z.infer<typeof FileUploadSchema>;
 export type TrackEventInput = z.infer<typeof TrackEventSchema>;
+export type NotificationPreferencesInput = z.infer<typeof NotificationPreferencesSchema>;
+
+export type CreateBookingFiltersInput = z.infer<typeof BookingFiltersSchema>;
 export type CreateCouponInput = z.infer<typeof CreateCouponSchema>;
 export type UpdatePricingInput = z.infer<typeof UpdatePricingSchema>;
 export type ReassignWorkerInput = z.infer<typeof ReassignWorkerSchema>;
-export type FileUploadInput = z.infer<typeof FileUploadSchema>;
 export type PaginationInput = z.infer<typeof PaginationSchema>;
