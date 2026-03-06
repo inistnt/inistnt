@@ -1,0 +1,1515 @@
+{
+  "info": {
+    "name": "Inistnt API",
+    "description": "Complete API collection for Inistnt platform\n\n**Setup:**\n1. Import this collection\n2. Import `Inistnt.postman_environment.json`\n3. Run `Auth / Staff Login` first to get token\n4. Run `Auth / Send OTP` + `Verify OTP` for user token",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",      "value": "http://localhost:3000/api/v1" },
+    { "key": "userToken",    "value": "" },
+    { "key": "workerToken",  "value": "" },
+    { "key": "staffToken",   "value": "" },
+    { "key": "bookingId",    "value": "" },
+    { "key": "workerId",     "value": "" },
+    { "key": "userId",       "value": "" },
+    { "key": "serviceId",    "value": "" },
+    { "key": "cityId",       "value": "" },
+    { "key": "addressId",    "value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Send OTP (User)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/send-otp",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"9999999999\"\n}" }
+          }
+        },
+        {
+          "name": "Verify OTP → User Token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success) {",
+            "  pm.collectionVariables.set('userToken', r.data.accessToken);",
+            "  pm.collectionVariables.set('userId', r.data.user?.id || r.data.worker?.id);",
+            "  console.log('✅ User token saved');",
+            "}"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/verify-otp",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"9999999999\",\n  \"otp\": \"123456\",\n  \"userType\": \"user\",\n  \"deviceOs\": \"android\"\n}" }
+          }
+        },
+        {
+          "name": "Send OTP (Worker)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/send-otp",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"8888888888\"\n}" }
+          }
+        },
+        {
+          "name": "Verify OTP → Worker Token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success) {",
+            "  pm.collectionVariables.set('workerToken', r.data.accessToken);",
+            "  pm.collectionVariables.set('workerId', r.data.worker?.id);",
+            "  console.log('✅ Worker token saved');",
+            "}"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/verify-otp",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"8888888888\",\n  \"otp\": \"123456\",\n  \"userType\": \"worker\",\n  \"deviceOs\": \"android\"\n}" }
+          }
+        },
+        {
+          "name": "Staff Login → Staff Token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success) {",
+            "  pm.collectionVariables.set('staffToken', r.data.accessToken);",
+            "  console.log('✅ Staff token saved:', r.data.staff.role);",
+            "}"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/staff/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@inistnt.com\",\n  \"password\": \"Admin@1234\"\n}" }
+          }
+        },
+        {
+          "name": "Staff Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/staff/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Get Me (User)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"<your_refresh_token>\"\n}" }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/logout",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"logoutAll\": false\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "👤 Users",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/users/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Rahul Sharma\",\n  \"email\": \"rahul@example.com\",\n  \"preferredLang\": \"hi\"\n}" }
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Addresses",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/addresses",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Add Address",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success) pm.collectionVariables.set('addressId', r.data.id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/me/addresses",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"tag\": \"Home\",\n  \"flat\": \"204\",\n  \"building\": \"Shivam Apartments\",\n  \"street\": \"Viram Khand\",\n  \"area\": \"Gomti Nagar\",\n  \"city\": \"Lucknow\",\n  \"state\": \"Uttar Pradesh\",\n  \"pincode\": \"226010\",\n  \"lat\": 26.856,\n  \"lng\": 81.000,\n  \"isDefault\": true\n}" }
+          }
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/users/me/addresses/{{addressId}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"tag\": \"Home\",\n  \"flat\": \"205\"\n}" }
+          }
+        },
+        {
+          "name": "Set Default Address",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/users/me/addresses/{{addressId}}/default",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/me/addresses/{{addressId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Loyalty Points",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/points",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Loyalty History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/points/history?page=1&limit=20",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Transactions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/transactions?page=1&limit=20",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/notifications?page=1&limit=20",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/notifications/unread-count",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Mark Notifications Read",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/me/notifications/read",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"notificationIds\": []\n}" }
+          }
+        },
+        {
+          "name": "Mark All Notifications Read",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/me/notifications/read-all",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Referral Info",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/referral",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Create Dispute",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/me/disputes",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"category\": \"WORK_QUALITY\",\n  \"description\": \"Worker ne kaam theek se nahi kiya, bathroom abhi bhi ganda hai.\"\n}" }
+          }
+        },
+        {
+          "name": "Get My Disputes",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/disputes",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔧 Workers",
+      "item": [
+        {
+          "name": "Get Public Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/{{workerId}}/profile"
+          }
+        },
+        {
+          "name": "Get Worker Reviews (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/{{workerId}}/reviews?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/workers/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Ramesh Kumar\",\n  \"email\": \"ramesh@example.com\",\n  \"tshirtSize\": \"L\"\n}" }
+          }
+        },
+        {
+          "name": "Update Status (Online)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/workers/me/status",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"online\"\n}" }
+          }
+        },
+        {
+          "name": "Update Status (Offline)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/workers/me/status",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"offline\"\n}" }
+          }
+        },
+        {
+          "name": "Update Location",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/workers/me/location",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 26.856,\n  \"lng\": 81.000,\n  \"accuracy\": 10\n}" }
+          }
+        },
+        {
+          "name": "Get Documents",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/documents",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/workers/me/documents",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"AADHAAR_FRONT\",\n  \"fileUrl\": \"https://storage.inistnt.com/docs/aadhaar_front.jpg\"\n}" }
+          }
+        },
+        {
+          "name": "Get Skills",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/skills",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Add Skill",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/workers/me/skills",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"serviceCategoryId\": \"<category_id>\",\n  \"experienceYears\": 2\n}" }
+          }
+        },
+        {
+          "name": "Remove Skill",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/workers/me/skills/<skillId>",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Earnings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/earnings?period=week",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Transactions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/transactions?page=1&limit=20",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Payouts",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/payouts?page=1&limit=20",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Request Payout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/workers/me/request-payout",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 500\n}" }
+          }
+        },
+        {
+          "name": "Get Bank Details",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/bank-details",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Update Bank Details",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/workers/me/bank-details",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"payoutMethod\": \"bank\",\n  \"bankAccountNo\": \"1234567890\",\n  \"bankIfsc\": \"SBIN0001234\",\n  \"bankName\": \"State Bank of India\"\n}" }
+          }
+        },
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/stats",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/notifications",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Rewards",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/rewards",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Incentive Programs",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/incentive-programs",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Subscription",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/workers/me/subscription",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🏙️ Geography",
+      "item": [
+        {
+          "name": "Get All Cities",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success && r.data.length > 0) {",
+            "  const lko = r.data.find(c => c.slug === 'lucknow');",
+            "  if (lko) pm.collectionVariables.set('cityId', lko.id);",
+            "  console.log('✅ cityId set to Lucknow:', lko?.id);",
+            "}"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cities"
+          }
+        },
+        {
+          "name": "Get All States",
+          "request": { "method": "GET", "url": "{{baseUrl}}/cities/states" }
+        },
+        {
+          "name": "Get Nearest City",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cities/nearest?lat=26.8467&lng=80.9462"
+          }
+        },
+        {
+          "name": "Get Area by Pincode",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cities/pincode/226010"
+          }
+        },
+        {
+          "name": "Get City by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cities/{{cityId}}"
+          }
+        },
+        {
+          "name": "Get City Areas",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cities/{{cityId}}/areas"
+          }
+        },
+        {
+          "name": "Get Active Surge",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cities/{{cityId}}/surge"
+          }
+        },
+        {
+          "name": "Get Surge Zones",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cities/{{cityId}}/surge-zones"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔨 Services",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/services/categories"
+          }
+        },
+        {
+          "name": "Get Category by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/services/categories/<categoryId>"
+          }
+        },
+        {
+          "name": "Get All Services",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success && r.data.length > 0) {",
+            "  pm.collectionVariables.set('serviceId', r.data[0].id);",
+            "  console.log('✅ serviceId set:', r.data[0].nameEn);",
+            "}"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/services?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Get Services by Category",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/services?categoryId=<categoryId>"
+          }
+        },
+        {
+          "name": "Search Services",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/services?search=cleaning"
+          }
+        },
+        {
+          "name": "Get Service by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/services/{{serviceId}}"
+          }
+        },
+        {
+          "name": "Get Service Pricing",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/services/{{serviceId}}/pricing?cityId={{cityId}}"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📋 Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success) {",
+            "  pm.collectionVariables.set('bookingId', r.data.id);",
+            "  console.log('✅ bookingId saved:', r.data.id, r.data.bookingNumber);",
+            "}"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"cityId\": \"{{cityId}}\",\n  \"addressId\": \"{{addressId}}\",\n  \"lat\": 26.856,\n  \"lng\": 81.000,\n  \"type\": \"INSTANT\",\n  \"userNotes\": \"Please bring own cleaning equipment\"\n}" }
+          }
+        },
+        {
+          "name": "Create Booking with Coupon",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"cityId\": \"{{cityId}}\",\n  \"addressId\": \"{{addressId}}\",\n  \"lat\": 26.856,\n  \"lng\": 81.000,\n  \"type\": \"INSTANT\",\n  \"couponCode\": \"WELCOME50\"\n}" }
+          }
+        },
+        {
+          "name": "Get My Bookings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings?page=1&limit=10",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Active Booking",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/active",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Get Booking Photos",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/photos",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        },
+        {
+          "name": "Cancel Booking (User)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/cancel",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Mujhe abhi service nahi chahiye\"\n}" }
+          }
+        },
+        {
+          "name": "Verify End OTP (User)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/verify-end-otp",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"otp\": \"4521\"\n}" }
+          }
+        },
+        {
+          "name": "Rate Booking",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/review",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Bahut accha kaam kiya!\",\n  \"tags\": [\"punctual\", \"professional\", \"clean_work\"]\n}" }
+          }
+        },
+        {
+          "name": "Trigger SOS (User)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/sos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 26.856,\n  \"lng\": 81.000,\n  \"description\": \"Worker behaving rudely\"\n}" }
+          }
+        },
+        {
+          "name": "--- WORKER ACTIONS ---",
+          "request": { "method": "GET", "url": "{{baseUrl}}" }
+        },
+        {
+          "name": "Get Worker Bookings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/worker/list?page=1&limit=10",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Get Worker Active Booking",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/worker/active",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Accept Booking",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/worker/{{bookingId}}/accept",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Mark Arrived",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/worker/{{bookingId}}/arrived",
+            "header": [{ "key": "Authorization", "value": "Bearer {{workerToken}}" }]
+          }
+        },
+        {
+          "name": "Verify Start OTP (Worker)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/worker/{{bookingId}}/verify-start-otp",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"otp\": \"1234\"\n}" }
+          }
+        },
+        {
+          "name": "Cancel Booking (Worker)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/worker/{{bookingId}}/cancel",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Emergency aa gayi ghar mein\"\n}" }
+          }
+        },
+        {
+          "name": "Upload Booking Photo",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/worker/{{bookingId}}/photos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"before\",\n  \"url\": \"https://storage.inistnt.com/photos/before.jpg\",\n  \"caption\": \"Before cleaning\"\n}" }
+          }
+        },
+        {
+          "name": "Trigger SOS (Worker)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings/worker/{{bookingId}}/sos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 26.856,\n  \"lng\": 81.000,\n  \"description\": \"User threatening me\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "💳 Payments",
+      "item": [
+        {
+          "name": "Create Razorpay Order",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.success) console.log('Razorpay Order ID:', r.data.razorpayOrderId);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/payments/create-order",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bookingId\": \"{{bookingId}}\"\n}" }
+          }
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/payments/verify",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"razorpayOrderId\": \"order_xxxx\",\n  \"razorpayPaymentId\": \"pay_xxxx\",\n  \"razorpaySignature\": \"<hmac_signature>\"\n}" }
+          }
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/payments/{{bookingId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📤 Uploads",
+      "item": [
+        {
+          "name": "Get Presigned URL (Profile Photo)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/uploads/presign",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"uploadType\": \"profile_photo\",\n  \"contentType\": \"image/jpeg\"\n}" }
+          }
+        },
+        {
+          "name": "Get Presigned URL (Aadhaar Front)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/uploads/presign",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"uploadType\": \"aadhaar_front\",\n  \"contentType\": \"image/jpeg\"\n}" }
+          }
+        },
+        {
+          "name": "Get Presigned URL (Booking Photo)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/uploads/presign",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"uploadType\": \"booking_before\",\n  \"contentType\": \"image/jpeg\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🛡️ Admin",
+      "item": [
+        {
+          "name": "📊 Dashboard",
+          "item": [
+            {
+              "name": "Get Dashboard Stats",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/dashboard?cityId={{cityId}}",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Get Live Ops",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/live-ops?cityId={{cityId}}",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            }
+          ]
+        },
+        {
+          "name": "👤 User Management",
+          "item": [
+            {
+              "name": "List Users",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/users?page=1&limit=20",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Search Users",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/users?search=rahul",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Suspend User",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/users/{{userId}}/suspend",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Fraudulent activity detected\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "🔧 Worker Management",
+          "item": [
+            {
+              "name": "List Workers",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/workers?cityId={{cityId}}&page=1&limit=20",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Verify Worker",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/workers/{{workerId}}/verify",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Suspend Worker",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/workers/{{workerId}}/suspend",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Multiple complaints received\"\n}" }
+              }
+            },
+            {
+              "name": "Change Worker Tier",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/admin/workers/{{workerId}}/tier",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"tier\": \"SILVER\"\n}" }
+              }
+            },
+            {
+              "name": "Approve Document",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/documents/<documentId>/approve",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Reject Document",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/documents/<documentId>/reject",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"note\": \"Document blurry hai, dubara upload karo\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "📋 Booking Management",
+          "item": [
+            {
+              "name": "List All Bookings",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/bookings?cityId={{cityId}}&page=1&limit=20",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "List Bookings by Status",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/bookings?status=COMPLETED&page=1&limit=20",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Refund Booking",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/bookings/{{bookingId}}/refund",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"amount\": 19900,\n  \"reason\": \"Service quality issue\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "⚠️ Disputes",
+          "item": [
+            {
+              "name": "List Disputes",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/disputes?status=OPEN&page=1&limit=20",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Resolve Dispute",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/disputes/<disputeId>/resolve",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"resolution\": \"Refund approved after reviewing evidence\",\n  \"refundAmount\": 199\n}" }
+              }
+            },
+            {
+              "name": "Add Dispute Note",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/disputes/<disputeId>/notes",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"note\": \"User se baat ki, photos review ki\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "🚨 SOS",
+          "item": [
+            {
+              "name": "List SOS Incidents",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/sos?status=ACTIVE&page=1&limit=20",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Resolve SOS",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/sos/<sosId>/resolve",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"reason\": \"User se baat ki, situation normal hai\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "💰 Commission",
+          "item": [
+            {
+              "name": "Get Commission Rules",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/commission-rules?cityId={{cityId}}",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Create Commission Rule",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/commission-rules",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"level\": \"CITY\",\n  \"value\": 10,\n  \"cityId\": \"{{cityId}}\",\n  \"reason\": \"Launch offer\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "⚡ Surge",
+          "item": [
+            {
+              "name": "Activate Surge",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/cities/{{cityId}}/surge/activate",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"multiplier\": 1.5,\n  \"reason\": \"High demand - festival season\",\n  \"deactivatesAt\": \"2026-12-31T23:59:59Z\"\n}" }
+              }
+            },
+            {
+              "name": "Deactivate Surge",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/cities/{{cityId}}/surge/deactivate",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🖼️ Banners",
+          "item": [
+            {
+              "name": "Get Banners",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/banners?cityId={{cityId}}",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Create Banner",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/banners",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"title\": \"Diwali Special 30% Off\",\n  \"imageUrl\": \"https://storage.inistnt.com/banners/diwali.jpg\",\n  \"deepLink\": \"inistnt://services/home-cleaning\",\n  \"cityId\": \"{{cityId}}\",\n  \"sortOrder\": 1\n}" }
+              }
+            },
+            {
+              "name": "Update Banner Status",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/admin/banners/<bannerId>/status",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"status\": \"ACTIVE\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "🎟️ Coupons",
+          "item": [
+            {
+              "name": "Get All Coupons",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/coupons",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Create Coupon",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/coupons",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"code\": \"HOLI30\",\n  \"discountType\": \"percentage\",\n  \"discountValue\": 30,\n  \"maxDiscount\": 20000,\n  \"minOrderAmount\": 29900,\n  \"validFrom\": \"2026-03-10T00:00:00Z\",\n  \"validTo\": \"2026-03-20T23:59:59Z\"\n}" }
+              }
+            },
+            {
+              "name": "Toggle Coupon",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/admin/coupons/<couponId>/toggle",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"isActive\": false\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "💸 Payouts",
+          "item": [
+            {
+              "name": "Get Pending Payouts",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/payouts/pending",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Process Payout",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/payouts/<payoutId>/process",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"utrNumber\": \"UTR123456789\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "🚩 Feature Flags",
+          "item": [
+            {
+              "name": "Get All Feature Flags",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/feature-flags",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Toggle Feature Flag",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/admin/feature-flags/surge_pricing",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"isEnabled\": true\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "🏙️ City / Area CRUD",
+          "item": [
+            {
+              "name": "Get Cities (Admin)",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/cities",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Create City",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/cities",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"nameHi\": \"लखनऊ\",\n  \"nameEn\": \"Lucknow\",\n  \"slug\": \"lucknow-new\",\n  \"stateId\": \"<stateId>\",\n  \"lat\": 26.8467,\n  \"lng\": 80.9462\n}" }
+              }
+            },
+            {
+              "name": "Get City Areas (Admin)",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/cities/{{cityId}}/areas",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🔧 Service CRUD",
+          "item": [
+            {
+              "name": "Get All Services (Admin)",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/services",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Create Service",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/services",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"categoryId\": \"<categoryId>\",\n  \"nameHi\": \"टाइल्स क्लीनिंग\",\n  \"nameEn\": \"Tiles Cleaning\",\n  \"slug\": \"tiles-cleaning\",\n  \"estimatedDurationMin\": 90\n}" }
+              }
+            },
+            {
+              "name": "Set Service Pricing",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/services/{{serviceId}}/pricing",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"cityId\": \"{{cityId}}\",\n  \"workerTier\": \"BASIC\",\n  \"basePrice\": 29900\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "👥 Staff CRUD",
+          "item": [
+            {
+              "name": "Get All Staff",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/staff",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Create Staff",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/staff",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"New Agent\",\n  \"email\": \"agent@inistnt.com\",\n  \"password\": \"Agent@1234\",\n  \"role\": \"SUPPORT_AGENT\",\n  \"cityId\": \"{{cityId}}\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "📱 App Versions",
+          "item": [
+            {
+              "name": "Get App Versions",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/app-versions",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Create App Version",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/admin/app-versions",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"platform\": \"android\",\n  \"version\": \"1.1.0\",\n  \"buildNumber\": 2,\n  \"isForceUpdate\": false\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "📋 Audit Logs",
+          "item": [
+            {
+              "name": "Get Audit Logs",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/audit-logs?page=1&limit=50",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            },
+            {
+              "name": "Get Audit Logs by Entity",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/admin/audit-logs?entityType=worker&entityId={{workerId}}",
+                "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "📈 Analytics",
+      "item": [
+        {
+          "name": "Revenue Analytics",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/analytics/revenue?cityId={{cityId}}&days=30",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "Booking Analytics",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/analytics/bookings?cityId={{cityId}}&days=30",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "Worker Analytics",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/analytics/workers?cityId={{cityId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "City Comparison",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/analytics/cities",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        }
+      ]
+    }
+
+  ]
+}

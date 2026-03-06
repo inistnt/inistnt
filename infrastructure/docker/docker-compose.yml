@@ -1,0 +1,234 @@
+# ═══════════════════════════════════════════════════════════
+# INISTNT — Local Development Infrastructure
+#
+# Start:        docker-compose up -d
+# Stop:         docker-compose down
+# Reset all:    docker-compose down -v
+# Logs:         docker-compose logs -f [service_name]
+#
+# Dev UIs:
+#   Redis UI:       http://localhost:8081
+#   Kafka UI:       http://localhost:8080
+#   Kibana (ES):    http://localhost:5601
+#   MinIO Console:  http://localhost:9001
+#   Email (dev):    http://localhost:8025
+# ═══════════════════════════════════════════════════════════
+
+networks:
+  inistnt-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  elasticsearch-data:
+  clickhouse-data:
+  kafka-data:
+  minio-data:
+
+services:
+
+  # ─────────────────────────────────────────
+  # POSTGRESQL 16 — Primary Database
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: inistnt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: inistnt
+      POSTGRES_PASSWORD: inistnt_dev_password
+      POSTGRES_DB: inistnt_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - inistnt-net
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U inistnt -d inistnt_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # REDIS 7 — Cache + Sessions + BullMQ + Pub/Sub
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: inistnt-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass inistnt_redis_password
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    networks:
+      - inistnt-net
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'inistnt_redis_password', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: inistnt-redis-ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: 'local:redis:6379:0:inistnt_redis_password'
+    ports:
+      - '8081:8081'
+    networks:
+      - inistnt-net
+    depends_on:
+      - redis
+
+  # ─────────────────────────────────────────
+  # ELASTICSEARCH 8 — Search Engine
+  # Worker search (geo + skills), service search
+  # ─────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: inistnt-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+    ports:
+      - '9200:9200'
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - inistnt-net
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -s http://localhost:9200/_cluster/health | grep -qv red']
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.3
+    container_name: inistnt-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
+    ports:
+      - '5601:5601'
+    networks:
+      - inistnt-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # APACHE KAFKA — KRaft Mode (Zookeeper nahi chahiye)
+  # Zookeeper hataya — KRaft mode use karo
+  # ─────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.5.3
+    container_name: inistnt-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 3
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - '9092:9092'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - inistnt-net
+    healthcheck:
+      test: ['CMD-SHELL', 'kafka-topics --bootstrap-server localhost:9092 --list']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: inistnt-kafka-ui
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: inistnt-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - '8080:8080'
+    networks:
+      - inistnt-net
+    depends_on:
+      - kafka
+
+  # ─────────────────────────────────────────
+  # CLICKHOUSE — Analytics (OLAP)
+  # Dashboard charts, revenue reports
+  # ─────────────────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.12
+    container_name: inistnt-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: inistnt
+      CLICKHOUSE_PASSWORD: inistnt_ch_password
+      CLICKHOUSE_DB: inistnt_analytics
+    ports:
+      - '8123:8123'
+      - '9009:9009'
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    networks:
+      - inistnt-net
+
+  # ─────────────────────────────────────────
+  # MINIO — S3 Compatible Storage
+  # Worker docs, selfies, banners, photos
+  # ─────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: inistnt-minio
+    restart: unless-stopped
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: inistnt_minio_user
+      MINIO_ROOT_PASSWORD: inistnt_minio_password
+    ports:
+      - '9003:9000'
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+    networks:
+      - inistnt-net
+
+  # ─────────────────────────────────────────
+  # MAILHOG — Local Email Catcher
+  # Dev mein sab emails yahan aayengi
+  # ─────────────────────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: inistnt-mailhog
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+    networks:
+      - inistnt-net

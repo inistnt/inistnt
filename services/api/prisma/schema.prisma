@@ -1,0 +1,1697 @@
+// ═══════════════════════════════════════════════════════════
+// INISTNT — Prisma Schema
+// PostgreSQL 16
+//
+// Tables:
+//  GEOGRAPHY:    states, cities, areas
+//  IDENTITY:     users, workers, staff
+//  CATALOG:      service_categories, services, service_pricing
+//  OPERATIONS:   bookings, booking_timeline, booking_photos
+//  PAYMENTS:     payments, payouts, wallets, transactions
+//  COMPLIANCE:   worker_documents, uniform_checks, verifications
+//  ENGAGEMENT:   reviews, disputes, sos_incidents, chat_messages
+//  GROWTH:       referrals, loyalty_points, coupons, subscriptions
+//  WORKERS+:     worker_skills, worker_rewards, incentive_programs
+//  ADMIN:        commission_rules, area_configs, banners
+//  COMMS:        notifications, campaigns, email_templates
+//  SYSTEM:       audit_logs, feature_flags, app_versions
+// ═══════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────────────────
+// ENUMS
+// ──────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+  BLOCKED
+}
+
+enum WorkerStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  ONLINE
+  OFFLINE
+  ON_JOB
+  SUSPENDED
+  BANNED
+}
+
+enum WorkerTier {
+  BASIC
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum EmploymentType {
+  GIG
+  FULL_TIME
+  PART_TIME
+}
+
+enum AreaOperationMode {
+  GIG_ONLY
+  HYBRID
+  FULL_TIME_PRIMARY
+}
+
+enum BookingStatus {
+  PENDING
+  SEARCHING
+  ASSIGNED
+  WORKER_ACCEPTED
+  WORKER_ON_WAY
+  WORKER_ARRIVED
+  OTP_VERIFIED
+  WORK_STARTED
+  WORK_COMPLETED
+  PAYMENT_PENDING
+  COMPLETED
+  CANCELLED_BY_USER
+  CANCELLED_BY_WORKER
+  CANCELLED_BY_ADMIN
+  NO_WORKER_FOUND
+}
+
+enum BookingType {
+  INSTANT
+  SCHEDULED
+}
+
+enum PaymentStatus {
+  PENDING
+  INITIATED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  UPI
+  CARD
+  NET_BANKING
+  WALLET
+  CASH
+  SUBSCRIPTION_CREDITS
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  ON_HOLD
+}
+
+enum TransactionType {
+  BOOKING_PAYMENT
+  BOOKING_REFUND
+  WORKER_EARNING
+  WORKER_COMMISSION_DEDUCTION
+  WORKER_BONUS
+  WORKER_PENALTY
+  UNIFORM_DEDUCTION
+  PAYOUT
+  SUBSCRIPTION_CHARGE
+  LOYALTY_REDEMPTION
+  REFERRAL_BONUS
+  LOAN_DISBURSEMENT
+  LOAN_REPAYMENT
+  ADJUSTMENT
+}
+
+enum DocumentType {
+  AADHAAR_FRONT
+  AADHAAR_BACK
+  PAN_CARD
+  DRIVING_LICENSE
+  BANK_PASSBOOK
+  POLICE_VERIFICATION
+  SELFIE
+  CERTIFICATE
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+enum DisputeRaisedBy {
+  USER
+  WORKER
+  ADMIN
+}
+
+enum DisputePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SosStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum StaffRole {
+  SUPER_ADMIN
+  STATE_MANAGER
+  CITY_MANAGER
+  AREA_MANAGER
+  FINANCE_ADMIN
+  SUPPORT_AGENT
+  FIELD_SUPERVISOR
+  QA_ANALYST
+  MARKETING_MANAGER
+  TECH_ADMIN
+}
+
+enum CommissionLevel {
+  NATIONAL
+  STATE
+  CITY
+  AREA
+  WORKER
+}
+
+enum SubscriptionPlan {
+  FREE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  GRACE_PERIOD
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  WHATSAPP
+  IN_APP
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SCHEDULED
+  SENT
+  CANCELLED
+}
+
+enum BannerStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  EXPIRED
+  REJECTED
+}
+
+enum UniformCheckResult {
+  COMPLIANT
+  NON_COMPLIANT
+  UNSURE
+  SKIPPED
+}
+
+enum FraudFlagType {
+  FAKE_LOCATION
+  FAKE_SELFIE
+  FAKE_COMPLETION
+  DUPLICATE_ACCOUNT
+  PAYMENT_FRAUD
+  REVIEW_MANIPULATION
+  UNIFORM_FRAUD
+  OTHER
+}
+
+enum FraudFlagSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReviewTargetType {
+  USER_TO_WORKER
+  WORKER_TO_USER
+}
+
+// ──────────────────────────────────────────────────────────
+// GEOGRAPHY
+// ──────────────────────────────────────────────────────────
+
+model State {
+  id         String  @id @default(cuid())
+  nameHi     String
+  nameEn     String
+  code       String  @unique // "UP", "MH", etc.
+  isActive   Boolean @default(true)
+  sortOrder  Int     @default(0)
+
+  cities     City[]
+  staff      Staff[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("states")
+}
+
+model City {
+  id         String  @id @default(cuid())
+  stateId    String
+  state      State   @relation(fields: [stateId], references: [id])
+  nameHi     String
+  nameEn     String
+  slug       String  @unique // "lucknow", "mumbai"
+  tier       String  @default("T2") // T1, T2, T3, T4
+  lat        Float
+  lng        Float
+  isActive   Boolean @default(true)
+  launchDate DateTime?
+
+  // Surge config stored as JSON (flexible)
+  surgeConfig Json    @default("{}")
+  // e.g., { maxMultiplier: 1.5, thresholds: [...] }
+
+  areas            Area[]
+  staff            Staff[]
+  servicePricing   ServicePricing[]
+  surgeZones       SurgeZone[]
+  workers          Worker[]
+  bookings         Booking[]
+  campaigns        Campaign[]
+  banners          Banner[]
+  commissionRules  CommissionRule[]
+  coupons          Coupon[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cities")
+}
+
+model Area {
+  id          String @id @default(cuid())
+  cityId      String
+  city        City   @relation(fields: [cityId], references: [id])
+  nameHi      String
+  nameEn      String
+  slug        String
+  pincodes    String[] // ["226010", "226012"]
+  lat         Float    // Center point
+  lng         Float
+  radiusKm    Float    @default(5.0)
+  isActive    Boolean  @default(true)
+
+  // Operations
+  operationMode    AreaOperationMode @default(GIG_ONLY)
+  modeChangedAt    DateTime?
+  modeChangedById  String?
+  modeChangeReason String?
+
+  commissionRules CommissionRule[]
+  workers         Worker[]
+  bookings        Booking[]
+  staff           Staff[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cityId, slug])
+  @@map("areas")
+}
+
+model SurgeZone {
+  id            String  @id @default(cuid())
+  cityId        String
+  city          City    @relation(fields: [cityId], references: [id])
+  name          String
+  // GeoJSON polygon stored as JSON
+  polygon       Json
+  multiplier    Float   @default(1.0)
+  isActive      Boolean @default(false)
+  reason        String?
+  activatedById String?
+  activatedAt   DateTime?
+  deactivatesAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("surge_zones")
+}
+
+// ──────────────────────────────────────────────────────────
+// USERS (Customers)
+// ──────────────────────────────────────────────────────────
+
+model User {
+  id             String     @id @default(cuid())
+  mobile         String     @unique
+  name           String?
+  email          String?    @unique
+  profilePhoto   String?    // S3 URL
+  status         UserStatus @default(ACTIVE)
+  preferredLang  String     @default("hi")
+
+  // Location
+  defaultAddressId String?
+
+  // Stats
+  totalBookings   Int     @default(0)
+  totalSpend      Int     @default(0) // In paise
+  loyaltyPoints   Int     @default(0)
+  referralCode    String  @unique
+
+  // Metadata
+  deviceOs        String?
+  appVersion      String?
+  lastActiveAt    DateTime?
+  deletedAt       DateTime?
+  deletionReason  String?
+
+  sessions       UserSession[]
+  addresses      Address[]
+  bookings       Booking[]
+  transactions   Transaction[]
+  notifications  Notification[]
+  reviews        Review[]        @relation("UserReviews")
+  disputes       Dispute[]       @relation("UserDisputes")
+  loyaltyHistory LoyaltyHistory[]
+  referralsMade  Referral[]      @relation("ReferrerUser")
+  referralUsed   Referral?       @relation("ReferredUser")
+  fraudFlags     FraudFlag[]
+  sosIncidents   SosIncident[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  refreshToken String   @unique
+  deviceId     String?
+  deviceName   String?
+  deviceOs     String?
+  ipAddress    String?
+  fcmToken     String?
+  isActive     Boolean  @default(true)
+  lastUsedAt   DateTime @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  tag       String  // "Home", "Work", "Other"
+  flat      String?
+  building  String?
+  street    String
+  area      String
+  city      String
+  state     String
+  pincode   String
+  lat       Float
+  lng       Float
+  isDefault Boolean @default(false)
+
+  bookings  Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+// ──────────────────────────────────────────────────────────
+// WORKERS
+// ──────────────────────────────────────────────────────────
+
+model Worker {
+  id              String       @id @default(cuid())
+  mobile          String       @unique
+  name            String
+  email           String?      @unique
+  profilePhoto    String?
+  status          WorkerStatus @default(PENDING_VERIFICATION)
+  tier            WorkerTier   @default(BASIC)
+  employmentType  EmploymentType @default(GIG)
+
+  // Location assignment
+  cityId          String?
+  city            City?        @relation(fields: [cityId], references: [id])
+  areaId          String?
+  area            Area?        @relation(fields: [areaId], references: [id])
+
+  // Identity
+  aadhaarNumber   String?      // Encrypted
+  panNumber       String?      // Encrypted
+  dateOfBirth     DateTime?
+  gender          String?
+  preferredLang   String       @default("hi")
+  tshirtSize      String?
+
+  // Banking
+  payoutMethod    String?      // "bank" | "upi"
+  bankAccountNo   String?      // Encrypted
+  bankIfsc        String?
+  bankName        String?
+  upiId           String?
+
+  // T-Shirt / Uniform
+  tshirtStatus         String   @default("not_issued") // not_issued | issued | paid
+  tshirtPaidAmount     Int      @default(0)  // In paise
+  tshirtMrp            Int      @default(49900) // ₹499 in paise
+  uniformComplianceScore Float  @default(1.0) // 0-1, rolling average
+
+  // Stats (denormalized for speed)
+  totalJobs          Int   @default(0)
+  completedJobs      Int   @default(0)
+  cancelledJobs      Int   @default(0)
+  rating             Float @default(0)
+  totalReviews       Int   @default(0)
+  acceptanceRate     Float @default(1.0)
+  completionRate     Float @default(1.0)
+  trustScore         Float @default(1.0)
+  consecutiveFiveStars Int @default(0)
+
+  // Finance
+  walletBalance      Int   @default(0) // In paise
+  pendingPayout      Int   @default(0)
+  totalEarned        Int   @default(0)
+  totalWithdrawn     Int   @default(0)
+  loanAmount         Int   @default(0)
+  loanRemaining      Int   @default(0)
+
+  // Worker referral
+  referralCode       String @unique
+  totalReferred      Int    @default(0)
+
+  // Session
+  fcmToken           String?
+  deviceOs           String?
+  appVersion         String?
+  lastActiveAt       DateTime?
+  isOnline           Boolean @default(false)
+  onlineSince        DateTime?
+
+  // Metadata
+  onboardedAt        DateTime?
+  suspendedAt        DateTime?
+  suspensionReason   String?
+  bannedAt           DateTime?
+  banReason          String?
+
+  sessions          WorkerSession[]
+  documents         WorkerDocument[]
+  skills            WorkerSkill[]
+  bookings          Booking[]
+  transactions      Transaction[]
+  earnings          WorkerEarning[]
+  payouts           WorkerPayout[]
+  reviews           Review[]         @relation("WorkerReviews")
+  disputes          Dispute[]        @relation("WorkerDisputes")
+  uniformChecks     UniformCheck[]
+  notifications     Notification[]
+  subscription      WorkerSubscription?
+  rewards           WorkerReward[]
+  incentiveEnrollments IncentiveProgramEnrollment[]
+  fraudFlags        FraudFlag[]
+  sosIncidents      SosIncident[]
+  loans             WorkerLoan[]
+  locationHistory   WorkerLocationHistory[]
+  referralsMade     Referral[]  @relation("ReferrerWorker")
+  referralUsed      Referral?   @relation("ReferredWorker")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("workers")
+}
+
+model WorkerSession {
+  id           String   @id @default(cuid())
+  workerId     String
+  worker       Worker   @relation(fields: [workerId], references: [id])
+  refreshToken String   @unique
+  deviceId     String?
+  deviceName   String?
+  deviceOs     String?
+  ipAddress    String?
+  fcmToken     String?
+  isActive     Boolean  @default(true)
+  lastUsedAt   DateTime @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([workerId])
+  @@map("worker_sessions")
+}
+
+model WorkerDocument {
+  id           String         @id @default(cuid())
+  workerId     String
+  worker       Worker         @relation(fields: [workerId], references: [id])
+  type         DocumentType
+  fileUrl      String         // S3 URL
+  status       DocumentStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt   DateTime?
+  rejectionNote String?
+  expiresAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("worker_documents")
+}
+
+model WorkerSkill {
+  id              String  @id @default(cuid())
+  workerId        String
+  worker          Worker  @relation(fields: [workerId], references: [id])
+  serviceCategoryId String
+  serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id])
+  experienceYears Int     @default(0)
+  isVerified      Boolean @default(false)
+  verifiedById    String?
+  verifiedAt      DateTime?
+  certificationUrl String? // S3 URL
+
+  createdAt DateTime @default(now())
+
+  @@unique([workerId, serviceCategoryId])
+  @@map("worker_skills")
+}
+
+model WorkerLocationHistory {
+  id        String   @id @default(cuid())
+  workerId  String
+  worker    Worker   @relation(fields: [workerId], references: [id])
+  lat       Float
+  lng       Float
+  accuracy  Float?
+  heading   Float?
+  speed     Float?
+  bookingId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([workerId, createdAt])
+  @@map("worker_location_history")
+}
+
+model WorkerSubscription {
+  id         String             @id @default(cuid())
+  workerId   String             @unique
+  worker     Worker             @relation(fields: [workerId], references: [id])
+  plan       SubscriptionPlan   @default(FREE)
+  status     SubscriptionStatus @default(ACTIVE)
+  startedAt  DateTime?
+  expiresAt  DateTime?
+  autoRenew  Boolean            @default(false)
+  cancelledAt DateTime?
+  cancelReason String?
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("worker_subscriptions")
+}
+
+model WorkerEarning {
+  id           String  @id @default(cuid())
+  workerId     String
+  worker       Worker  @relation(fields: [workerId], references: [id])
+  bookingId    String? @unique
+  booking      Booking? @relation(fields: [bookingId], references: [id])
+  grossAmount  Int     // Booking value in paise
+  commission   Int     // Platform commission in paise
+  netAmount    Int     // Worker ka share in paise
+  bonusAmount  Int     @default(0)
+  penaltyAmount Int    @default(0)
+  uniformDeduction Int @default(0)
+  finalAmount  Int     // Wallet mein jayega
+
+  createdAt DateTime @default(now())
+
+  @@index([workerId])
+  @@map("worker_earnings")
+}
+
+model WorkerPayout {
+  id            String      @id @default(cuid())
+  workerId      String
+  worker        Worker      @relation(fields: [workerId], references: [id])
+  amount        Int         // In paise
+  status        PayoutStatus @default(PENDING)
+  payoutMethod  String      // "bank" | "upi"
+  utrNumber     String?     // Bank transfer reference
+  failureReason String?
+  processedById String?
+  processedAt   DateTime?
+  period        String?     // "2024-W42" ya "2024-10"
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("worker_payouts")
+}
+
+model WorkerReward {
+  id          String  @id @default(cuid())
+  workerId    String
+  worker      Worker  @relation(fields: [workerId], references: [id])
+  type        String  // "tshirt" | "cash" | "certificate" | "badge"
+  title       String
+  titleHi     String
+  description String
+  amount      Int?    // For cash rewards in paise
+  imageUrl    String? // For physical rewards
+  isClaimed   Boolean @default(false)
+  claimedAt   DateTime?
+  claimDetails Json?  // Delivery address etc.
+  expiresAt   DateTime?
+  milestoneKey String? // Which milestone triggered this
+
+  createdAt DateTime @default(now())
+
+  @@map("worker_rewards")
+}
+
+model WorkerLoan {
+  id             String  @id @default(cuid())
+  workerId       String
+  worker         Worker  @relation(fields: [workerId], references: [id])
+  amount         Int     // Total loan in paise
+  outstanding    Int     // Remaining in paise
+  interestRate   Float   @default(18.0) // Annual %
+  purpose        String  // "tools" | "vehicle" | "other"
+  status         String  @default("active") // active | closed
+  approvedById   String?
+  approvedAt     DateTime?
+  emiAmount      Int     // Per booking deduction in paise
+  lastDeductedAt DateTime?
+  closedAt       DateTime?
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("worker_loans")
+}
+
+// ──────────────────────────────────────────────────────────
+// SERVICE CATALOG
+// ──────────────────────────────────────────────────────────
+
+model ServiceCategory {
+  id           String  @id @default(cuid())
+  nameHi       String
+  nameEn       String
+  slug         String  @unique
+  iconUrl      String?
+  bannerUrl    String?
+  description  String?
+  sortOrder    Int     @default(0)
+  isActive     Boolean @default(true)
+  parentId     String? // For sub-categories
+  parent       ServiceCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children     ServiceCategory[] @relation("CategoryTree")
+
+  services     Service[]
+  workerSkills WorkerSkill[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("service_categories")
+}
+
+model Service {
+  id           String  @id @default(cuid())
+  categoryId   String
+  category     ServiceCategory @relation(fields: [categoryId], references: [id])
+  nameHi       String
+  nameEn       String
+  slug         String  @unique
+  descriptionHi String?
+  descriptionEn String?
+  iconUrl      String?
+  imageUrl     String?
+  sortOrder    Int     @default(0)
+  isActive     Boolean @default(true)
+  requiresInspection Boolean @default(false)
+  estimatedDurationMin Int @default(60)
+  searchKeywords String[] // For Elasticsearch
+
+  pricing      ServicePricing[]
+  bookings     Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("services")
+}
+
+model ServicePricing {
+  id            String  @id @default(cuid())
+  serviceId     String
+  service       Service @relation(fields: [serviceId], references: [id])
+  cityId        String
+  city          City    @relation(fields: [cityId], references: [id])
+  workerTier    WorkerTier @default(BASIC)
+  basePrice     Int     // Minimum in paise
+  hourlyRate    Int?    // Per hour in paise (optional)
+  platformFeePercent Float @default(14.0)
+  isActive      Boolean @default(true)
+  effectiveFrom DateTime @default(now())
+  effectiveTo   DateTime?
+  changedById   String?
+  changeReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([serviceId, cityId, workerTier])
+  @@map("service_pricing")
+}
+
+// ──────────────────────────────────────────────────────────
+// BOOKINGS — Core of the product
+// ──────────────────────────────────────────────────────────
+
+model Booking {
+  id               String        @id @default(cuid())
+  bookingNumber    String        @unique // "INS-2024-00001"
+
+  userId           String
+  user             User          @relation(fields: [userId], references: [id])
+  workerId         String?
+  worker           Worker?       @relation(fields: [workerId], references: [id])
+  serviceId        String
+  service          Service       @relation(fields: [serviceId], references: [id])
+  cityId           String
+  city             City          @relation(fields: [cityId], references: [id])
+  areaId           String?
+  area             Area?         @relation(fields: [areaId], references: [id])
+  addressId        String
+  address          Address       @relation(fields: [addressId], references: [id])
+
+  status           BookingStatus @default(PENDING)
+  type             BookingType   @default(INSTANT)
+  scheduledFor     DateTime?
+
+
+
+  transactions Transaction[]
+
+  // Location
+  lat              Float
+  lng              Float
+
+  // Pricing
+  baseAmount       Int           // In paise
+  surgeMultiplier  Float         @default(1.0)
+  surgeAmount      Int           @default(0)
+  discountAmount   Int           @default(0)
+  loyaltyDiscount  Int           @default(0)
+  couponCode       String?
+  couponId         String?
+  coupon           Coupon?       @relation(fields: [couponId], references: [id])
+  finalAmount      Int           // What user pays
+
+  // Worker payout
+  workerEarning    Int           @default(0)
+  commissionAmount Int           @default(0)
+  commissionRate   Float         @default(12.0) // Snapshot at booking time
+
+  // OTP
+  startOtp         String?       // Work start OTP
+  endOtp           String?       // Work end OTP
+  startOtpVerifiedAt DateTime?
+  endOtpVerifiedAt   DateTime?
+
+  // Timing
+  assignedAt       DateTime?
+  workerAcceptedAt DateTime?
+  workerArrivedAt  DateTime?
+  workStartedAt    DateTime?
+  workCompletedAt  DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  cancellationReason String?
+  cancellationFee  Int           @default(0)
+  cancelledById    String?
+  cancelledByRole  String?
+
+  // Worker search tracking
+  broadcastCount   Int           @default(0)
+  workersNotified  String[]      // worker IDs
+
+  // Notes
+  userNotes        String?
+  workerNotes      String?
+
+  payment          Payment?
+  timeline         BookingTimeline[]
+  photos           BookingPhoto[]
+  earning          WorkerEarning?
+  review           Review?
+  dispute          Dispute?
+  sosIncident      SosIncident?
+  messages         ChatMessage[]
+  uniformCheck     UniformCheck?
+  notifications    Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([workerId])
+  @@index([status])
+  @@index([cityId, status])
+  @@map("bookings")
+}
+
+model BookingTimeline {
+  id        String @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  status    BookingStatus
+  note      String?
+  actorId   String?  // who triggered this
+  actorType String?  // "user" | "worker" | "system" | "admin"
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@map("booking_timeline")
+}
+
+model BookingPhoto {
+  id        String @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  type      String  // "before" | "after" | "evidence"
+  url       String  // S3 URL
+  uploadedById String
+  uploadedByType String // "worker" | "user"
+  caption   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("booking_photos")
+}
+
+// ──────────────────────────────────────────────────────────
+// PAYMENTS
+// ──────────────────────────────────────────────────────────
+
+model Payment {
+  id                   String        @id @default(cuid())
+  bookingId            String        @unique
+  booking              Booking       @relation(fields: [bookingId], references: [id])
+  userId               String
+  amount               Int           // In paise
+  method               PaymentMethod?
+  status               PaymentStatus @default(PENDING)
+
+  // Razorpay
+  razorpayOrderId      String?       @unique
+  razorpayPaymentId    String?       @unique
+  razorpaySignature    String?
+
+  // Refund
+  refundAmount         Int           @default(0)
+  refundReason         String?
+  refundedAt           DateTime?
+  refundedById         String?
+  razorpayRefundId     String?
+
+  capturedAt           DateTime?
+  failureReason        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+model Transaction {
+  id               String          @id @default(cuid())
+  type             TransactionType
+  amount           Int             // In paise (positive = credit, negative = debit)
+
+  // Who it belongs to
+  userId           String?
+  user             User?           @relation(fields: [userId], references: [id])
+  workerId         String?
+  worker           Worker?         @relation(fields: [workerId], references: [id])
+
+  // References
+  bookingId        String?
+  booking          Booking?        @relation(fields: [bookingId], references: [id])
+  payoutId         String?
+  payout           WorkerPayout?   @relation(fields: [payoutId], references: [id])
+  subscriptionId   String?
+  subscription     WorkerSubscription? @relation(fields: [subscriptionId], references: [id])
+  loanId           String?
+  loan             WorkerLoan?     @relation(fields: [loanId], references: [id])
+
+  // Balance after
+  balanceBefore    Int
+  balanceAfter     Int
+
+  description      String
+  metadata         Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([workerId])
+  @@map("transactions")
+}
+
+// ──────────────────────────────────────────────────────────
+// UNIFORM CHECK
+// ──────────────────────────────────────────────────────────
+
+model UniformCheck {
+  id              String             @id @default(cuid())
+  bookingId       String             @unique
+  booking         Booking            @relation(fields: [bookingId], references: [id])
+  workerId        String
+  worker          Worker             @relation(fields: [workerId], references: [id])
+
+  // Selfie data
+  selfieUrl       String             // S3 URL
+  selfieTimestamp DateTime           @default(now()) // Server-side stamp
+  selfieLat       Float
+  selfieLng       Float
+
+  // AI Result
+  aiResult        UniformCheckResult @default(UNSURE)
+  aiConfidence    Float              @default(0)
+  aiModelVersion  String?
+
+  // Customer Vote (fallback)
+  customerVote    String?            // "yes" | "no" | "no_response"
+  customerVotedAt DateTime?
+
+  // Final decision
+  finalResult     UniformCheckResult @default(UNSURE)
+  amountDeducted  Int                @default(0) // In paise
+  deductionNote   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("uniform_checks")
+}
+
+// ──────────────────────────────────────────────────────────
+// REVIEWS & DISPUTES
+// ──────────────────────────────────────────────────────────
+
+model Review {
+  id             String         @id @default(cuid())
+  bookingId      String         @unique
+  booking        Booking        @relation(fields: [bookingId], references: [id])
+  targetType     ReviewTargetType
+  rating         Int            // 1-5
+  comment        String?
+
+  // User → Worker
+  reviewerId     String?
+  reviewer       User?          @relation("UserReviews", fields: [reviewerId], references: [id])
+  workerId       String?
+  worker         Worker?        @relation("WorkerReviews", fields: [workerId], references: [id])
+  tags           String[]       // predefined tags
+
+  // Worker response
+  workerResponse String?
+  respondedAt    DateTime?
+
+  // Admin
+  isFlagged      Boolean        @default(false)
+  flagReason     String?
+  isVisible      Boolean        @default(true)
+  moderatedById  String?
+  moderatedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
+}
+
+model Dispute {
+  id           String         @id @default(cuid())
+  bookingId    String         @unique
+  booking      Booking        @relation(fields: [bookingId], references: [id])
+  raisedBy     DisputeRaisedBy
+  userId       String?
+  user         User?          @relation("UserDisputes", fields: [userId], references: [id])
+  workerId     String?
+  worker       Worker?        @relation("WorkerDisputes", fields: [workerId], references: [id])
+  status       DisputeStatus  @default(OPEN)
+  priority     DisputePriority @default(MEDIUM)
+  category     String         // "payment" | "quality" | "behaviour" | "fraud"
+  description  String
+  evidenceUrls String[]
+
+  // Resolution
+  resolution   String?
+  refundAmount Int?
+  resolvedById String?
+  resolvedAt   DateTime?
+
+  // Assignment
+  assignedTo   String?        // staff id
+  assignedAt   DateTime?
+
+  escalatedTo  String?        // staff id
+  escalatedAt  DateTime?
+  escalationReason String?
+
+  notes        DisputeNote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("disputes")
+}
+
+model DisputeNote {
+  id         String  @id @default(cuid())
+  disputeId  String
+  dispute    Dispute @relation(fields: [disputeId], references: [id])
+  authorId   String
+  authorRole String
+  note       String
+  isInternal Boolean @default(true)
+  isUrgent   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@map("dispute_notes")
+}
+
+model SosIncident {
+  id           String    @id @default(cuid())
+  bookingId    String    @unique
+  booking      Booking   @relation(fields: [bookingId], references: [id])
+  triggeredBy  String    // "user" | "worker"
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id])
+  workerId     String?
+  worker       Worker?   @relation(fields: [workerId], references: [id])
+  status       SosStatus @default(ACTIVE)
+  description  String?
+  lat          Float
+  lng          Float
+
+  acknowledgedById String?
+  acknowledgedAt   DateTime?
+  acknowledgeNote  String?
+
+  resolvedById     String?
+  resolvedAt       DateTime?
+  outcome          String?
+  incidentReport   String?
+  emergencyDispatched Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sos_incidents")
+}
+
+// ──────────────────────────────────────────────────────────
+// CHAT
+// ──────────────────────────────────────────────────────────
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  senderId    String
+  senderType  String   // "user" | "worker" | "support"
+  content     String?
+  mediaUrl    String?  // S3 URL
+  mediaType   String?  // "image" | "audio"
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@map("chat_messages")
+}
+
+// ──────────────────────────────────────────────────────────
+// GROWTH — Referrals, Loyalty, Coupons
+// ──────────────────────────────────────────────────────────
+
+model Referral {
+  id              String   @id @default(cuid())
+  code            String
+  referrerType    String   // "user" | "worker"
+  referrerUserId  String?
+  referrerUser    User?    @relation("ReferrerUser", fields: [referrerUserId], references: [id])
+  referrerWorkerId String?
+  referrerWorker  Worker?  @relation("ReferrerWorker", fields: [referrerWorkerId], references: [id])
+
+  referredUserId  String?  @unique
+  referredUser    User?    @relation("ReferredUser", fields: [referredUserId], references: [id])
+  referredWorkerId String? @unique
+  referredWorker  Worker?  @relation("ReferredWorker", fields: [referredWorkerId], references: [id])
+
+  referrerBonusPaid Boolean @default(false)
+  referrerBonusAmount Int   @default(0)
+  referredBonusPaid Boolean @default(false)
+  referredBonusAmount Int   @default(0)
+  completedAt     DateTime? // When bonus was triggered
+
+  createdAt DateTime @default(now())
+
+  @@map("referrals")
+}
+
+model LoyaltyHistory {
+  id          String  @id @default(cuid())
+  userId      String
+  user        User    @relation(fields: [userId], references: [id])
+  type        String  // "earned" | "redeemed" | "expired"
+  points      Int
+  bookingId   String?
+  description String
+  expiresAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("loyalty_history")
+}
+
+model Coupon {
+  id             String    @id @default(cuid())
+  code           String    @unique
+  title          String
+  descriptionHi  String?
+  descriptionEn  String?
+  discountType   String    // "percentage" | "flat"
+  discountValue  Int       // percentage (25) or flat amount in paise (15000 = ₹150)
+  maxDiscount    Int?      // Cap in paise
+  minOrderAmount Int       @default(0) // In paise
+  isActive       Boolean   @default(true)
+  validFrom      DateTime
+  validTo        DateTime
+
+  // Restrictions
+  targetCityIds  String[]
+  targetUserType String?   // "new_users" | "all" | "specific"
+  maxUsageTotal  Int?
+  maxUsagePerUser Int      @default(1)
+  usedCount      Int       @default(0)
+  
+  // Created by
+  createdById    String?
+  cityId         String?
+  city           City?     @relation(fields: [cityId], references: [id])
+
+  bookings       Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("coupons")
+}
+
+// ──────────────────────────────────────────────────────────
+// INCENTIVE PROGRAMS
+// ──────────────────────────────────────────────────────────
+
+model IncentiveProgram {
+  id              String     @id @default(cuid())
+  title           String
+  titleHi         String
+  description     String
+  target          String     // "new_workers" | "all_workers" | "specific_tier"
+  targetTier      WorkerTier?
+  targetCityIds   String[]
+  bonusAmount     Int        // In paise
+  requiredBookings Int
+  requiredRating  Float?
+  validFrom       DateTime
+  validTo         DateTime
+  isActive        Boolean    @default(true)
+  createdById     String?
+  enrolledCount   Int        @default(0)
+  completedCount  Int        @default(0)
+
+  enrollments IncentiveProgramEnrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("incentive_programs")
+}
+
+model IncentiveProgramEnrollment {
+  id         String          @id @default(cuid())
+  programId  String
+  program    IncentiveProgram @relation(fields: [programId], references: [id])
+  workerId   String
+  worker     Worker          @relation(fields: [workerId], references: [id])
+  progress   Int             @default(0) // bookings completed
+  isCompleted Boolean        @default(false)
+  completedAt DateTime?
+  bonusPaid   Boolean        @default(false)
+  bonusPaidAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([programId, workerId])
+  @@map("incentive_program_enrollments")
+}
+
+// ──────────────────────────────────────────────────────────
+// STAFF & ADMIN
+// ──────────────────────────────────────────────────────────
+
+model Staff {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  mobile       String?   @unique
+  role         StaffRole
+  isActive     Boolean   @default(true)
+
+  // Scope — what this staff can see
+  stateId      String?
+  state        State?    @relation(fields: [stateId], references: [id])
+  cityId       String?
+  city         City?     @relation(fields: [cityId], references: [id])
+  areaId       String?
+  area         Area?     @relation(fields: [areaId], references: [id])
+
+  // Multi-city support
+  assignedCityIds String[]
+
+  // Auth
+  passwordHash String?
+  lastLoginAt  DateTime?
+
+  // Invited by
+  invitedById  String?
+  invitedBy    Staff?    @relation("StaffInvites", fields: [invitedById], references: [id])
+  invitees     Staff[]   @relation("StaffInvites")
+
+  sessions     StaffSession[]
+  auditLogs    AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("staff")
+}
+
+model StaffSession {
+  id           String   @id @default(cuid())
+  staffId      String
+  staff        Staff    @relation(fields: [staffId], references: [id])
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  isActive     Boolean  @default(true)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("staff_sessions")
+}
+
+// ──────────────────────────────────────────────────────────
+// COMMISSION RULES — Layered system
+// ──────────────────────────────────────────────────────────
+
+model CommissionRule {
+  id             String          @id @default(cuid())
+  level          CommissionLevel
+  value          Float           // Percentage (12.5 = 12.5%)
+  isActive       Boolean         @default(true)
+
+  // Scope
+  stateId        String?
+  cityId         String?
+  city           City?           @relation(fields: [cityId], references: [id])
+  areaId         String?
+  area           Area?           @relation(fields: [areaId], references: [id])
+  workerId       String?         // Worker-level override
+
+  // Effective period
+  effectiveFrom  DateTime        @default(now())
+  effectiveTo    DateTime?
+
+  // Who set it and why
+  setById        String
+  reason         String?
+
+  // Should workers be notified?
+  workerNotified Boolean         @default(false)
+  notifiedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("commission_rules")
+}
+
+// ──────────────────────────────────────────────────────────
+// CONTENT — Banners, Email Templates, Themes
+// ──────────────────────────────────────────────────────────
+
+model Banner {
+  id            String       @id @default(cuid())
+  title         String?
+  imageUrl      String       // S3 URL
+  deepLink      String?      // Where to go on tap
+  status        BannerStatus @default(DRAFT)
+
+  // Targeting
+  targetType    String       @default("all") // "all" | "users" | "workers"
+  targetCityIds String[]     // Empty = all cities
+  cityId        String?
+  city          City?        @relation(fields: [cityId], references: [id])
+
+  // Schedule
+  scheduledFrom DateTime?
+  scheduledTo   DateTime?
+
+  sortOrder     Int          @default(0)
+  clickCount    Int          @default(0)
+  viewCount     Int          @default(0)
+
+  // Approval workflow
+  createdById   String
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectedReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("banners")
+}
+
+model EmailTemplate {
+  id          String  @id @default(cuid())
+  slug        String  @unique  // "booking_confirmed", "welcome_user"
+  nameHi      String
+  nameEn      String
+  subject     String
+  // HTML template with {{variable}} syntax
+  bodyHtml    String
+  // Variables this template uses
+  variables   String[]
+  // City-specific overrides stored as JSON
+  cityOverrides Json  @default("{}")
+  isActive    Boolean @default(true)
+  editedById  String?
+  lastEditedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+model ThemeConfig {
+  id              String  @id @default(cuid())
+  scope           String  @default("global") // "global" | "city:{id}"
+  primaryColor    String  @default("#FF5733")
+  secondaryColor  String  @default("#2C3E50")
+  accentColor     String  @default("#F39C12")
+  logoUrl         String?
+  appIconUrl      String?
+  fontFamily      String  @default("Noto Sans")
+  isActive        Boolean @default(true)
+  updatedById     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scope])
+  @@map("theme_configs")
+}
+
+// ──────────────────────────────────────────────────────────
+// CAMPAIGNS & NOTIFICATIONS
+// ──────────────────────────────────────────────────────────
+
+model Campaign {
+  id            String         @id @default(cuid())
+  title         String
+  status        CampaignStatus @default(DRAFT)
+
+  // Targeting
+  targetType    String         // "all_users" | "all_workers" | "city" | "area" | "custom"
+  cityId        String?
+  city          City?          @relation(fields: [cityId], references: [id])
+  targetCityIds String[]
+  workerTier    WorkerTier?
+  audienceSize  Int            @default(0)
+
+  // Channels
+  channels      NotificationChannel[]
+
+  // Content
+  pushTitle     String?
+  pushBody      String?
+  smsText       String?
+  emailSubject  String?
+  emailBodyHtml String?
+  deepLink      String?
+
+  // Stats
+  sentCount     Int            @default(0)
+  deliveredCount Int           @default(0)
+  openedCount   Int            @default(0)
+
+  // Schedule
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+
+  // Approval
+  createdById   String
+  approvedById  String?
+  approvedAt    DateTime?
+  cancelledById String?
+
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("campaigns")
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  channel     NotificationChannel
+  title       String?
+  body        String
+  deepLink    String?
+  imageUrl    String?
+  isRead      Boolean             @default(false)
+  readAt      DateTime?
+
+  // Recipient
+  userId      String?
+  user        User?               @relation(fields: [userId], references: [id])
+  workerId    String?
+  worker      Worker?             @relation(fields: [workerId], references: [id])
+
+  // Context
+  bookingId   String?
+  booking     Booking?            @relation(fields: [bookingId], references: [id])
+  campaignId  String?
+  campaign    Campaign?           @relation(fields: [campaignId], references: [id])
+
+  // Delivery
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failureReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([workerId])
+  @@map("notifications")
+}
+
+// ──────────────────────────────────────────────────────────
+// FRAUD FLAGS
+// ──────────────────────────────────────────────────────────
+
+model FraudFlag {
+  id          String            @id @default(cuid())
+  type        FraudFlagType
+  severity    FraudFlagSeverity @default(MEDIUM)
+  description String
+  status      String            @default("open") // open | reviewed | dismissed
+
+  // Subject
+  userId      String?
+  user        User?             @relation(fields: [userId], references: [id])
+  workerId    String?
+  worker      Worker?           @relation(fields: [workerId], references: [id])
+  bookingId   String?
+
+  // Evidence
+  evidenceUrls String[]
+  metadata    Json?
+
+  // Review
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  actionTaken  String?
+
+  // Auto-detected or manual
+  isAutoDetected Boolean        @default(false)
+  detectedById   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("fraud_flags")
+}
+
+// ──────────────────────────────────────────────────────────
+// SYSTEM
+// ──────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String  @id @default(cuid())
+  action      String  // "worker.suspend" | "commission.update"
+  entityType  String  // "worker" | "booking" | "commission"
+  entityId    String
+  actorId     String
+  actorRole   String
+  actor       Staff?  @relation(fields: [actorId], references: [id])
+  before      Json?   // State before
+  after       Json?   // State after
+  ipAddress   String?
+  userAgent   String?
+  reason      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+model FeatureFlag {
+  id                 String   @id @default(cuid())
+  key                String   @unique // "uniform_ai_check"
+  description        String
+  isEnabled          Boolean  @default(false)
+  rolloutPercentage  Int      @default(100) // 0-100
+  enabledCityIds     String[] // Empty = all cities
+  updatedById        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("feature_flags")
+}
+
+model AppVersion {
+  id             String  @id @default(cuid())
+  platform       String  // "android" | "ios"
+  currentVersion String  // "2.1.0"
+  minVersion     String  // Minimum supported
+  forceUpdate    Boolean @default(false)
+  updateMessage  String?
+  storeUrl       String
+  isActive       Boolean @default(true)
+  updatedById    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([platform])
+  @@map("app_versions")
+}
+
+model OtpStore {
+  id          String   @id @default(cuid())
+  mobile      String
+  otp         String
+  purpose     String   // "login" | "booking_start" | "booking_end" | "aadhaar"
+  attempts    Int      @default(0)
+  isUsed      Boolean  @default(false)
+  expiresAt   DateTime
+  usedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([mobile, purpose])
+  @@map("otp_store")
+}
