@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "jest"],
+    "baseUrl": ".",
+    "paths": {
+      "@inistnt/api/*": ["src/*"],
+      "@inistnt/types": ["../types/src"],
+      "@inistnt/utils": ["../utils/src"],
+      "@inistnt/validators": ["../validators/src"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

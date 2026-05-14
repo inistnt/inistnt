@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { workerRepo } from './worker.repository';
 import { kafka, KafkaTopics } from '../../infrastructure/kafka';
+import { checkPayoutLimit, incrementPayoutCount } from './payout-limit.service';
 
 // ─── PUBLIC ─────────────────────────────────────────────────
 
@@ -102,10 +103,44 @@ export async function getPayouts(req: FastifyRequest, rep: FastifyReply) {
 
 export async function requestPayout(req: FastifyRequest, rep: FastifyReply) {
   const { amount } = req.body as { amount: number };
+
+  // ── Payout limit check (FREE: 10/month, SILVER: 20/month, GOLD+: unlimited) ──
+  const limitCheck = await checkPayoutLimit(req.currentUser.id);
+  let finalAmount = amount;
+
+  if (limitCheck.isOverLimit && limitCheck.extraFeeApplied > 0) {
+    if (amount <= limitCheck.extraFeeApplied) {
+      return rep.status(400).send({
+        success: false,
+        error: {
+          code: 'AMOUNT_TOO_LOW',
+          message: `Withdrawal fee ₹${limitCheck.extraFeeApplied / 100} amount se zyada hai. Minimum ₹${Math.ceil((limitCheck.extraFeeApplied + 1) / 100)} withdraw karein.`,
+          extraFee: limitCheck.extraFeeApplied,
+        },
+      });
+    }
+    finalAmount = amount - limitCheck.extraFeeApplied;
+  }
+
   const worker = await workerRepo.findById(req.currentUser.id);
   const method = worker?.payoutMethod ?? 'bank';
-  const payout = await workerRepo.requestPayout(req.currentUser.id, amount, method);
-  return rep.send({ success: true, data: payout });
+  const payout = await workerRepo.requestPayout(req.currentUser.id, finalAmount, method);
+
+  // Increment monthly counter after successful payout creation
+  await incrementPayoutCount(req.currentUser.id);
+
+  return rep.send({
+    success: true,
+    data: {
+      ...payout,
+      withdrawalInfo: {
+        usedThisMonth:   limitCheck.usedThisMonth + 1,
+        freeLimit:       limitCheck.freeLimit,
+        extraFeeApplied: limitCheck.extraFeeApplied,
+        plan:            limitCheck.plan,
+      },
+    },
+  });
 }
 
 // ─── BANK DETAILS ────────────────────────────────────────────────

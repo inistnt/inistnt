@@ -210,23 +210,32 @@ async function main() {
   // ─── STAFF ACCOUNTS ──────────────────────────────────────────
 
   console.log('👥 Staff Accounts...');
-  const defaultPassword = 'Admin@1234';
+
+  // SuperAdmin password: from env or strong default
+  // IMPORTANT: Change SUPER_ADMIN_PASSWORD in .env before first deploy!
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD ?? 'InistntSuperAdmin@2026!';
+  const superAdminHash     = await bcrypt.hash(superAdminPassword, 12);
+
+  const defaultPassword = process.env.DEFAULT_STAFF_PASSWORD ?? 'Staff@Inistnt2026!';
   const passwordHash    = await bcrypt.hash(defaultPassword, 12);
+
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL ?? 'superadmin@inistnt.com';
+
   const staffData = [
-    { name: 'Super Admin',       email: 'admin@inistnt.com',     role: 'SUPER_ADMIN',       citySlug: null       },
-    { name: 'Tech Admin',        email: 'tech@inistnt.com',      role: 'TECH_ADMIN',        citySlug: null       },
-    { name: 'Finance Admin',     email: 'finance@inistnt.com',   role: 'FINANCE_ADMIN',     citySlug: null       },
-    { name: 'Lucknow Manager',   email: 'lko@inistnt.com',       role: 'CITY_MANAGER',      citySlug: 'lucknow'  },
-    { name: 'Support Agent 1',   email: 'support1@inistnt.com',  role: 'SUPPORT_AGENT',     citySlug: 'lucknow'  },
-    { name: 'Support Agent 2',   email: 'support2@inistnt.com',  role: 'SUPPORT_AGENT',     citySlug: 'lucknow'  },
-    { name: 'Field Supervisor',  email: 'field@inistnt.com',     role: 'FIELD_SUPERVISOR',  citySlug: 'lucknow'  },
-    { name: 'Marketing Manager', email: 'marketing@inistnt.com', role: 'MARKETING_MANAGER', citySlug: null       },
-    { name: 'QA Analyst',        email: 'qa@inistnt.com',        role: 'QA_ANALYST',        citySlug: null       },
+    { name: 'Super Admin',       email: superAdminEmail,         role: 'SUPER_ADMIN',       citySlug: null,       hash: superAdminHash },
+    { name: 'Tech Admin',        email: 'tech@inistnt.com',      role: 'TECH_ADMIN',        citySlug: null,       hash: passwordHash },
+    { name: 'Finance Admin',     email: 'finance@inistnt.com',   role: 'FINANCE_ADMIN',     citySlug: null,       hash: passwordHash },
+    { name: 'Lucknow Manager',   email: 'lko@inistnt.com',       role: 'CITY_MANAGER',      citySlug: 'lucknow',  hash: passwordHash },
+    { name: 'Support Agent 1',   email: 'support1@inistnt.com',  role: 'SUPPORT_AGENT',     citySlug: 'lucknow',  hash: passwordHash },
+    { name: 'Support Agent 2',   email: 'support2@inistnt.com',  role: 'SUPPORT_AGENT',     citySlug: 'lucknow',  hash: passwordHash },
+    { name: 'Field Supervisor',  email: 'field@inistnt.com',     role: 'FIELD_SUPERVISOR',  citySlug: 'lucknow',  hash: passwordHash },
+    { name: 'Marketing Manager', email: 'marketing@inistnt.com', role: 'MARKETING_MANAGER', citySlug: null,       hash: passwordHash },
+    { name: 'QA Analyst',        email: 'qa@inistnt.com',        role: 'QA_ANALYST',        citySlug: null,       hash: passwordHash },
   ];
   for (const s of staffData) {
     await db.staff.upsert({
       where: { email: s.email }, update: {},
-      create: { name: s.name, email: s.email, role: s.role as any, passwordHash, isActive: true, cityId: s.citySlug ? cityMap[s.citySlug] : undefined },
+      create: { name: s.name, email: s.email, role: s.role as any, passwordHash: (s as any).hash ?? passwordHash, isActive: true, cityId: s.citySlug ? cityMap[s.citySlug] : undefined },
     });
   }
   console.log(`   ✅ ${staffData.length} staff accounts`);
@@ -312,9 +321,12 @@ async function main() {
   Coupons:      3
   Flags:        ${flags.length}
 
-  🔑 Staff Login → POST /api/v1/auth/staff/login
+  🔑 SuperAdmin (2-Step) → POST /api/v1/superadmin/auth/login
+     Email: ${superAdminEmail}
+     Password: ${superAdminPassword} (change this!)
+
+  📧 Other Staff → POST /api/v1/auth/staff/login
      Password: ${defaultPassword}
-     admin@inistnt.com     → SUPER_ADMIN
      lko@inistnt.com       → CITY_MANAGER
      support1@inistnt.com  → SUPPORT_AGENT
   `);

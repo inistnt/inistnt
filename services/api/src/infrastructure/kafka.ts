@@ -28,6 +28,7 @@ export const KafkaTopics = {
   WORKER_ONLINE:        'worker.online',
   WORKER_OFFLINE:       'worker.offline',
   WORKER_LOCATION:      'worker.location.updated',
+  WORKER_LOCATION_UPDATED: 'worker.location.updated', // alias
   WORKER_SUSPENDED:     'worker.suspended',
   WORKER_TIER_CHANGED:  'worker.tier.changed',
 
@@ -37,6 +38,7 @@ export const KafkaTopics = {
 
   // Uniform
   UNIFORM_CHECK_DONE: 'uniform.check.completed',
+  UNIFORM_AI_RESULT:  'uniform.ai.result',
 
   // SOS
   SOS_TRIGGERED:    'sos.triggered',
@@ -45,7 +47,18 @@ export const KafkaTopics = {
   // Reviews
   REVIEW_CREATED:   'review.created',
 
-  // Notifications
+  // Chat
+  CHAT_MESSAGE_SENT: 'chat.message.sent',
+  CHAT_MESSAGE_READ: 'chat.message.read',
+
+  // Calls (WebRTC signaling events)
+  CALL_INITIATED:   'call.initiated',
+  CALL_ACCEPTED:    'call.accepted',
+  CALL_ENDED:       'call.ended',
+  CALL_MISSED:      'call.missed',
+
+  // Campaigns & Notifications
+  CAMPAIGN_SEND:     'campaign.send',
   NOTIFICATION_SEND: 'notification.send',
   EMAIL_SEND:        'email.send',
   SMS_SEND:          'sms.send',
@@ -59,12 +72,9 @@ export type KafkaTopic = typeof KafkaTopics[keyof typeof KafkaTopics];
 
 const kafkaClient = new Kafka({
   clientId: config.KAFKA_CLIENT_ID,
-  brokers: config.KAFKA_BROKERS,
+  brokers:  config.KAFKA_BROKERS,
   logLevel: config.NODE_ENV === 'production' ? logLevel.WARN : logLevel.ERROR,
-  retry: {
-    initialRetryTime: 300,
-    retries: 10,
-  },
+  retry: { initialRetryTime: 300, retries: 10 },
 });
 
 const producer: Producer = kafkaClient.producer({
@@ -86,35 +96,27 @@ export const kafka = {
     await producer.disconnect();
   },
 
-  // Publish a single event
-  publish: async <T>(
-    topic: KafkaTopic,
-    payload: T,
-    key?: string
-  ): Promise<void> => {
+  publish: async <T>(topic: KafkaTopic, payload: T, key?: string): Promise<void> => {
     await producer.send({
       topic,
-      messages: [
-        {
-          key: key ?? null,
-          value: JSON.stringify({
-            ...payload as Record<string, unknown>,
-            _meta: {
-              topic,
-              timestamp: new Date().toISOString(),
-              service: config.KAFKA_CLIENT_ID,
-            },
-          }),
-        },
-      ],
+      messages: [{
+        key: key ?? null,
+        value: JSON.stringify({
+          ...payload as Record<string, unknown>,
+          _meta: {
+            topic,
+            timestamp: new Date().toISOString(),
+            service: config.KAFKA_CLIENT_ID,
+          },
+        }),
+      }],
     });
   },
 
-  // Create a consumer for a specific group
   createConsumer: (groupId: string): Consumer => {
     return kafkaClient.consumer({
       groupId,
-      sessionTimeout: 30000,
+      sessionTimeout:    30000,
       heartbeatInterval: 3000,
     });
   },
@@ -125,67 +127,63 @@ export const kafka = {
 // ──────────────────────────────────────────────────────────
 
 export interface BookingCreatedEvent {
-  bookingId: string;
-  userId: string;
-  serviceId: string;
-  cityId: string;
-  areaId?: string;
-  lat: number;
-  lng: number;
-  amount: number;
-  scheduledFor?: string;
+  bookingId: string; userId: string; serviceId: string;
+  cityId: string; areaId?: string; lat: number; lng: number;
+  amount: number; scheduledFor?: string;
 }
 
 export interface BookingAssignedEvent {
-  bookingId: string;
-  workerId: string;
-  userId: string;
-  workerLat: number;
-  workerLng: number;
-  estimatedArrivalMin: number;
+  bookingId: string; workerId: string; userId: string;
+  workerLat: number; workerLng: number; estimatedArrivalMin: number;
 }
 
 export interface BookingCompletedEvent {
-  bookingId: string;
-  userId: string;
-  workerId: string;
-  amount: number;
-  commissionAmount: number;
-  workerEarning: number;
-  cityId: string;
-  serviceId: string;
-  completedAt: string;
+  bookingId: string; userId: string; workerId: string;
+  amount: number; commissionAmount: number; workerEarning: number;
+  cityId: string; serviceId: string; completedAt: string;
 }
 
 export interface PaymentCapturedEvent {
-  paymentId: string;
-  bookingId: string;
-  userId: string;
-  workerId: string;
-  amount: number;
-  method: string;
+  paymentId: string; bookingId: string; userId: string;
+  workerId: string; amount: number; method: string;
 }
 
 export interface WorkerLocationEvent {
-  workerId: string;
-  cityId: string;
-  lat: number;
-  lng: number;
-  heading?: number;
-  speed?: number;
-  bookingId?: string;
+  workerId: string; cityId: string; lat: number; lng: number;
+  heading?: number; speed?: number; bookingId?: string;
 }
 
 export interface NotificationSendEvent {
   recipientType: 'user' | 'worker' | 'staff';
-  recipientId: string;
-  fcmToken?: string;
-  mobile?: string;
-  email?: string;
-  channels: string[];
-  title?: string;
-  body: string;
-  deepLink?: string;
-  imageUrl?: string;
-  bookingId?: string;
+  recipientId:   string;
+  fcmToken?:     string;
+  mobile?:       string;
+  email?:        string;
+  channels:      string[];
+  title?:        string;
+  body:          string;
+  deepLink?:     string;
+  imageUrl?:     string;
+  bookingId?:    string;
+}
+
+export interface ChatMessageEvent {
+  messageId:   string;
+  bookingId:   string;
+  senderId:    string;
+  senderType:  string;
+  content?:    string;
+  mediaUrl?:   string;
+  mediaType?:  string;
+  sentAt:      string;
+}
+
+export interface CallEvent {
+  sessionId:     string;
+  bookingId:     string;
+  callType:      'ptt' | 'voice';
+  initiatorId:   string;
+  initiatorType: string;
+  receiverId:    string;
+  receiverType:  string;
 }

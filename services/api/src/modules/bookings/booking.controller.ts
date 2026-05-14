@@ -2,11 +2,44 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { bookingRepo } from './booking.repository';
 import { bookingService } from './booking.service';
 import { kafka, KafkaTopics } from '../../infrastructure/kafka';
+import { calculateBookingAmount } from './hourly-billing.service';
+import { db } from '../../infrastructure/database';
 
 // ─── USER ACTIONS ────────────────────────────────────────────
 
 export async function createBooking(req: FastifyRequest, rep: FastifyReply) {
-  const booking = await bookingService.create({ ...(req.body as any), userId: req.currentUser.id });
+  const body = req.body as any;
+
+  // ── Hourly billing ──────────────────────────────────────────────
+  const billing = await calculateBookingAmount({
+    serviceId:  body.serviceId,
+    cityId:     body.cityId,
+    workerTier: 'BASIC',
+    hours:      body.bookedHours ?? 1,
+  });
+
+  // ── Loyalty points redemption ───────────────────────────────────
+  // 1 point = ₹0.10 (10 paise). Max redeem: upto 20% of booking amount.
+  let loyaltyDiscount = 0;
+  if (body.redeemPoints) {
+    const user = await db.user.findUnique({
+      where:  { id: req.currentUser.id },
+      select: { loyaltyPoints: true },
+    });
+    const availablePoints = user?.loyaltyPoints ?? 0;
+    const maxDiscount     = Math.floor(billing.baseAmount * 0.20); // max 20%
+    const pointsValue     = availablePoints * 10;                  // 1 pt = 10 paise
+    loyaltyDiscount       = Math.min(pointsValue, maxDiscount);
+  }
+
+  const booking = await bookingService.create({
+    ...body,
+    userId:          req.currentUser.id,
+    baseAmount:      billing.baseAmount,
+    bookedHours:     billing.bookedHours,
+    loyaltyDiscount,
+    redeemPoints:    body.redeemPoints ?? false,
+  });
   return rep.status(201).send({ success: true, data: booking });
 }
 
@@ -99,7 +132,7 @@ export async function markArrived(req: FastifyRequest, rep: FastifyReply) {
   const booking = await bookingRepo.findById(bookingId);
   if (!booking || booking.workerId !== req.currentUser.id) return rep.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied.' } });
   await bookingRepo.updateStatus(bookingId, 'WORKER_ARRIVED', {}, req.currentUser.id, 'worker');
-  return rep.send({ success: true, data: { message: 'Customer ko start OTP bhej diya gaya.' } });
+  return rep.send({ success: true, data: { message: 'Customer ko OTP bhej diya. Unse start OTP lo.' } });
 }
 
 export async function verifyStartOtp(req: FastifyRequest, rep: FastifyReply) {
@@ -132,4 +165,78 @@ export async function triggerSosByWorker(req: FastifyRequest, rep: FastifyReply)
   const sos = await bookingRepo.createSos(bookingId, 'worker', undefined, req.currentUser.id, lat, lng, description);
   await kafka.publish(KafkaTopics.SOS_TRIGGERED, { sosId: sos.id, bookingId, workerId: req.currentUser.id, lat, lng }, bookingId);
   return rep.send({ success: true, data: { message: 'SOS bhej diya.', sos } });
+}
+
+// ─── UNIFORM CHECK — Worker selfie submit + AI analyze ─────────
+export async function submitUniformCheck(req: FastifyRequest, rep: FastifyReply) {
+  const { bookingId } = req.params as { bookingId: string };
+  const { selfieUrl, lat, lng } = req.body as { selfieUrl: string; lat: number; lng: number };
+  const workerId = req.currentUser.id;
+
+  // Booking aur worker verify karo
+  const booking = await db.booking.findUnique({
+    where:  { id: bookingId },
+    select: { workerId: true, status: true, uniformCheck: { select: { id: true } } },
+  });
+  if (!booking || booking.workerId !== workerId) {
+    return rep.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied.' } });
+  }
+  if (booking.uniformCheck) {
+    return rep.status(400).send({ success: false, error: { code: 'ALREADY_SUBMITTED', message: 'Is booking ka uniform check pehle se submit ho chuka hai.' } });
+  }
+
+  // DB mein save karo turant (AI async mein chalega)
+  const check = await db.uniformCheck.create({
+    data: {
+      bookingId,
+      workerId,
+      selfieUrl,
+      selfieLat:    lat,
+      selfieLng:    lng,
+      aiResult:     'UNSURE',
+      aiConfidence: 0,
+      finalResult:  'UNSURE',
+    },
+  });
+
+  // AI analysis async mein (response block nahi karega)
+  setImmediate(async () => {
+    try {
+      const { analyzeUniformPhotoRateLimited } = await import('../../infrastructure/uniform-ai.service');
+      const aiResult = await analyzeUniformPhotoRateLimited(selfieUrl);
+
+      const finalResult = aiResult.confidence >= 0.75
+        ? aiResult.result
+        : 'UNSURE';
+
+      await db.uniformCheck.update({
+        where: { id: check.id },
+        data: {
+          aiResult:       aiResult.result as any,
+          aiConfidence:   aiResult.confidence,
+          aiModelVersion: aiResult.modelVersion,
+          finalResult:    finalResult as any,
+        },
+      });
+
+      await kafka.publish(KafkaTopics.UNIFORM_AI_RESULT, {
+        checkId:    check.id,
+        bookingId,
+        workerId,
+        result:     finalResult,
+        confidence: aiResult.confidence,
+      }, bookingId);
+    } catch (err: any) {
+      console.error('[UniformCheck] AI analysis failed:', err.message);
+    }
+  });
+
+  return rep.status(201).send({
+    success: true,
+    data: {
+      checkId:  check.id,
+      message:  'Selfie submit ho gayi. AI analysis ho raha hai, result kuch seconds mein milega.',
+      status:   'PROCESSING',
+    },
+  });
 }

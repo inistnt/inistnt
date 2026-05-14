@@ -332,6 +332,7 @@ export const staffAuthService = {
     if (!staff) throw { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Email ya password galat hai.' };
     if (!staff.isActive) throw { statusCode: 403, code: 'ACCOUNT_DISABLED', message: 'Account disabled hai. Admin se contact karo.' };
 
+    if (!staff.passwordHash) throw { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Email ya password galat hai.' };
     const valid = await bcrypt.compare(password, staff.passwordHash);
     if (!valid) throw { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Email ya password galat hai.' };
 

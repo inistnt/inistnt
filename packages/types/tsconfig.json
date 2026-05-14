@@ -4,7 +4,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "moduleResolution": "node",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "skipLibCheck": false,
+    "typeRoots": ["../../node_modules/@types"],
+    "types": ["bcryptjs"]
   },
   "include": ["src/**/*"]
 }

@@ -6,10 +6,10 @@ import { config } from '../config';
 // ─────────────────────────────────────────────────────────────
 
 export const ch = createClient({
-  host:     config.CLICKHOUSE_URL     ?? 'http://localhost:8123',
-  username: config.CLICKHOUSE_USER    ?? 'inistnt',
-  password: config.CLICKHOUSE_PASSWORD ?? 'inistnt_ch_password',
-  database: config.CLICKHOUSE_DB      ?? 'inistnt_analytics',
+  host:     `http://${config.CLICKHOUSE_HOST}:${config.CLICKHOUSE_PORT}`,
+  username: config.CLICKHOUSE_USER,
+  password: config.CLICKHOUSE_PASSWORD,
+  database: config.CLICKHOUSE_DATABASE,
 });
 
 // ─── CREATE TABLES (run once on startup) ─────────────────────
@@ -114,6 +114,13 @@ export async function createAnalyticsTables() {
 
 // ─── INSERT HELPERS ───────────────────────────────────────────
 
+const chTs = (d: Date = new Date()) => d.toISOString().replace('T', ' ').slice(0, 19);
+const asUInt = (v: unknown) => {
+  const n = Number(v ?? 0);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
+};
+
 export async function insertBookingEvent(row: Partial<{
   event_type:     string;
   booking_id:     string;
@@ -137,9 +144,33 @@ export async function insertBookingEvent(row: Partial<{
   rating:         number | null;
   created_at:     string;
 }>) {
+  const normalized = {
+    event_type: row.event_type ?? 'unknown',
+    booking_id: row.booking_id ?? '',
+    booking_number: row.booking_number ?? '',
+    user_id: row.user_id ?? '',
+    worker_id: row.worker_id ?? null,
+    service_id: row.service_id ?? '',
+    category_id: row.category_id ?? '',
+    city_id: row.city_id ?? '',
+    area_id: row.area_id ?? null,
+    amount: asUInt(row.amount),
+    discount: asUInt(row.discount),
+    platform_fee: asUInt(row.platform_fee),
+    worker_earning: asUInt(row.worker_earning),
+    payment_method: row.payment_method ?? null,
+    cancel_reason: row.cancel_reason ?? null,
+    cancelled_by: row.cancelled_by ?? null,
+    lat: typeof row.lat === 'number' ? row.lat : null,
+    lng: typeof row.lng === 'number' ? row.lng : null,
+    duration_min: typeof row.duration_min === 'number' ? Math.max(0, Math.floor(row.duration_min)) : null,
+    rating: typeof row.rating === 'number' ? row.rating : null,
+    created_at: row.created_at ?? chTs(),
+  };
+
   await ch.insert({
-    table:  'booking_events',
-    values: [row],
+    table: 'booking_events',
+    values: [normalized],
     format: 'JSONEachRow',
   });
 }
@@ -155,9 +186,21 @@ export async function insertPaymentEvent(row: Partial<{
   city_id:     string | null;
   created_at:  string;
 }>) {
+  const normalized = {
+    event_type: row.event_type ?? 'unknown',
+    payment_id: row.payment_id ?? '',
+    booking_id: row.booking_id ?? '',
+    user_id: row.user_id ?? '',
+    worker_id: row.worker_id ?? null,
+    amount: asUInt(row.amount),
+    method: row.method ?? null,
+    city_id: row.city_id ?? null,
+    created_at: row.created_at ?? chTs(),
+  };
+
   await ch.insert({
-    table:  'payment_events',
-    values: [row],
+    table: 'payment_events',
+    values: [normalized],
     format: 'JSONEachRow',
   });
 }
@@ -169,9 +212,17 @@ export async function insertWorkerLocation(row: {
   lng:         number;
   is_online:   number;
 }) {
+  const normalized = {
+    worker_id: row.worker_id ?? '',
+    city_id: row.city_id ?? '',
+    lat: Number(row.lat ?? 0),
+    lng: Number(row.lng ?? 0),
+    is_online: row.is_online ? 1 : 0,
+  };
+
   await ch.insert({
-    table:  'worker_locations',
-    values: [row],
+    table: 'worker_locations',
+    values: [normalized],
     format: 'JSONEachRow',
   });
 }
@@ -185,9 +236,19 @@ export async function insertSosEvent(row: Partial<{
   lng:          number | null;
   created_at:   string;
 }>) {
+  const normalized = {
+    sos_id: row.sos_id ?? '',
+    booking_id: row.booking_id ?? '',
+    triggered_by: row.triggered_by ?? 'unknown',
+    city_id: row.city_id ?? '',
+    lat: typeof row.lat === 'number' ? row.lat : null,
+    lng: typeof row.lng === 'number' ? row.lng : null,
+    created_at: row.created_at ?? chTs(),
+  };
+
   await ch.insert({
-    table:  'sos_events',
-    values: [row],
+    table: 'sos_events',
+    values: [normalized],
     format: 'JSONEachRow',
   });
 }

@@ -114,6 +114,11 @@ export const paymentService = {
 
     if (!payment) throw { statusCode: 404, message: 'Payment record nahi mila.' };
 
+    // Idempotency guard
+    if (payment.status === 'CAPTURED') {
+      return payment;
+    }
+
     const updatedPayment = await db.payment.update({
       where: { id: payment.id },
       data: {

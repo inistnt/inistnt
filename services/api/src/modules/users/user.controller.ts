@@ -120,6 +120,7 @@ export async function createDispute(req: FastifyRequest, rep: FastifyReply) {
       bookingId, userId: req.currentUser.id, workerId: booking.workerId,
       category, description, status: 'OPEN',
       priority: category === 'PAYMENT' ? 'HIGH' : 'MEDIUM',
+      raisedBy: 'USER',
     },
   });
   return rep.status(201).send({ success: true, data: dispute });

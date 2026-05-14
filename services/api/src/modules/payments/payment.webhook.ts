@@ -5,6 +5,23 @@ import { kafka, KafkaTopics } from '../../infrastructure/kafka';
 import { config } from '../../config';
 
 // ─────────────────────────────────────────────────────────────
+// BUG 8 FIX: Razorpay method strings → PaymentMethod enum
+// Razorpay sends: 'upi', 'card', 'netbanking', 'wallet', 'emi'
+// Our enum:        UPI,   CARD,  NET_BANKING,   WALLET,  CARD
+// ─────────────────────────────────────────────────────────────
+function toPaymentMethod(raw?: string): string {
+  const map: Record<string, string> = {
+    upi:        'UPI',
+    card:       'CARD',
+    netbanking: 'NET_BANKING',   // toUpperCase() gives 'NETBANKING' — wrong!
+    wallet:     'WALLET',
+    emi:        'CARD',
+    cash:       'CASH',
+  };
+  return map[raw?.toLowerCase() ?? ''] ?? 'UPI';
+}
+
+// ─────────────────────────────────────────────────────────────
 // RAZORPAY WEBHOOK HANDLER
 //
 // Flow:
@@ -21,42 +38,61 @@ export async function handleRazorpayWebhook(
   req: FastifyRequest,
   rep: FastifyReply,
 ) {
-  // 1. Verify webhook signature ──────────────────────────────
   const signature = req.headers['x-razorpay-signature'] as string;
   if (!signature) {
     return rep.status(400).send({ error: 'Missing signature' });
   }
 
-  const rawBody = JSON.stringify(req.body); // Fastify parses JSON — need raw
+  const raw = (req as any).rawBody as string | Buffer | undefined;
+  if (!raw) {
+    req.log.error('rawBody not available. Enable raw body for webhook route.');
+    return rep.status(400).send({ error: 'Invalid webhook payload' });
+  }
+
+  const rawBody = typeof raw === 'string' ? raw : raw.toString('utf8');
+
   const expected = crypto
     .createHmac('sha256', config.RAZORPAY_WEBHOOK_SECRET)
     .update(rawBody)
     .digest('hex');
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    req.log.warn({ signature }, '⚠️ Invalid Razorpay webhook signature');
+  const sigBuf = Buffer.from(signature, 'utf8');
+  const expBuf = Buffer.from(expected, 'utf8');
+
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    req.log.warn({ signature }, 'Invalid Razorpay webhook signature');
     return rep.status(400).send({ error: 'Invalid signature' });
   }
 
   const event = req.body as RazorpayWebhookEvent;
-  req.log.info({ event: event.event, paymentId: event.payload?.payment?.entity?.id }, '📩 Razorpay webhook received');
+  if (!event?.event || !event?.payload) {
+    return rep.status(400).send({ error: 'Malformed event' });
+  }
+
+  req.log.info({ event: event.event, paymentId: event.payload?.payment?.entity?.id }, 'Razorpay webhook received');
 
   try {
     switch (event.event) {
 
       // ─── PAYMENT CAPTURED ────────────────────────────────
       case 'payment.captured':
-        await handlePaymentCaptured(event.payload.payment.entity);
+        if (event.payload.payment) {
+          await handlePaymentCaptured(event.payload.payment.entity);
+        }
         break;
 
       // ─── PAYMENT FAILED ──────────────────────────────────
       case 'payment.failed':
-        await handlePaymentFailed(event.payload.payment.entity);
+        if (event.payload.payment) {
+          await handlePaymentFailed(event.payload.payment.entity);
+        }
         break;
 
       // ─── REFUND PROCESSED ────────────────────────────────
       case 'refund.processed':
-        await handleRefundProcessed(event.payload.refund.entity);
+        if (event.payload.refund) {
+          await handleRefundProcessed(event.payload.refund.entity);
+        }
         break;
 
       default:
@@ -79,8 +115,8 @@ async function handlePaymentCaptured(payment: RazorpayPayment) {
     include: {
       booking: {
         include: {
-          user:    { select: { id: true, name: true, fcmToken: true, mobile: true, email: true } },
-          worker:  { select: { id: true, name: true, fcmToken: true } },
+          user:    { select: { id: true, name: true, mobile: true, email: true } },
+          worker:  { select: { id: true, name: true } },
           service: { select: { nameEn: true } },
           city:    { select: { nameEn: true } },
         },
@@ -108,23 +144,26 @@ async function handlePaymentCaptured(payment: RazorpayPayment) {
         status:              'CAPTURED',
         razorpayPaymentId:   payment.id,
         capturedAt:          new Date(payment.created_at * 1000),
-        method:              payment.method,
+        method:              toPaymentMethod(payment.method) as any, // BUG 8 FIX: proper enum mapping
       },
     }),
     db.booking.update({
       where: { id: booking.id },
-      data:  { paymentStatus: 'PAID' },
+      data:  { status: 'COMPLETED' },  // BUG 1 FIX: paymentStatus doesn't exist → update booking status to COMPLETED
     }),
     db.transaction.create({
       data: {
-        bookingId:   booking.id,
-        userId:      booking.userId,
-        type:        'PAYMENT',
-        amount:      payment.amount,
-        currency:    'INR',
-        status:      'SUCCESS',
-        reference:   payment.id,
-        description: `Payment for booking ${booking.bookingNumber}`,
+        bookingId:    booking.id,
+        userId:       booking.userId,
+        type:         'BOOKING_PAYMENT',  // BUG 2 FIX: 'PAYMENT_CAPTURED' not in TransactionType enum
+        amount:       payment.amount,
+        // BUG 6 FIX: currency field doesn't exist in Transaction model
+        // BUG 7 FIX: status field doesn't exist in Transaction model
+        // BUG 5 FIX: reference field doesn't exist — stored in metadata instead
+        balanceBefore: 0,   // BUG 4 FIX: required field — not tracked at webhook layer
+        balanceAfter:  0,   // BUG 4 FIX: required field — not tracked at webhook layer
+        description:  `Payment for booking ${booking.bookingNumber}`,
+        metadata:     { razorpayPaymentId: payment.id, razorpayOrderId: payment.order_id },
       },
     }),
   ]);
@@ -163,6 +202,9 @@ async function handlePaymentFailed(payment: RazorpayPayment) {
 
   if (!paymentRecord) return;
 
+  // idempotency: repeated webhook retry
+  if (paymentRecord.status === 'FAILED') return;
+
   await db.$transaction([
     db.payment.update({
       where: { id: paymentRecord.id },
@@ -172,10 +214,8 @@ async function handlePaymentFailed(payment: RazorpayPayment) {
         failureReason:     payment.error_description ?? 'Payment failed',
       },
     }),
-    db.booking.update({
-      where: { id: paymentRecord.bookingId },
-      data:  { paymentStatus: 'FAILED' },
-    }),
+    // BUG 1 FIX: paymentStatus field doesn't exist in Booking model
+    // Booking status stays PAYMENT_PENDING — no booking update needed here
   ]);
 
   await kafka.publish(KafkaTopics.PAYMENT_FAILED, {
@@ -209,26 +249,42 @@ async function handleRefundProcessed(refund: RazorpayRefund) {
 
   if (!paymentRecord) return;
 
+  // robust idempotency: refund already processed?
+  const existingRefundTxn = await db.transaction.findFirst({
+    where: { 
+      bookingId: paymentRecord.bookingId,
+      type: 'BOOKING_REFUND',
+      metadata: { path: ['razorpayRefundId'], equals: refund.id },
+    },
+    select: { id: true },
+  });
+  if (existingRefundTxn) return;
+
   await db.$transaction([
     db.payment.update({
       where: { id: paymentRecord.id },
       data: {
-        refundId:     refund.id,
-        refundAmount: refund.amount,
-        refundedAt:   new Date(refund.created_at * 1000),
-        status:       'REFUNDED',
+        refundAmount:    refund.amount,
+        refundedAt:      new Date(refund.created_at * 1000),
+        status:          'REFUNDED',
+        razorpayRefundId: refund.id,  // store refund id on payment record
       },
     }),
+    // BUG 1 FIX: paymentStatus field doesn't exist in Booking
+    // Booking status is already CANCELLED at refund time — no update needed
     db.transaction.create({
       data: {
-        bookingId:   paymentRecord.bookingId,
-        userId:      paymentRecord.booking.userId,
-        type:        'REFUND',
-        amount:      refund.amount,
-        currency:    'INR',
-        status:      'SUCCESS',
-        reference:   refund.id,
-        description: `Refund for booking ${paymentRecord.booking.bookingNumber}`,
+        bookingId:    paymentRecord.bookingId,
+        userId:       paymentRecord.booking.userId,
+        type:         'BOOKING_REFUND',   // BUG 3 FIX: 'REFUND' not in TransactionType enum
+        amount:       refund.amount,
+        // BUG 6 FIX: currency doesn't exist in Transaction model
+        // BUG 7 FIX: status doesn't exist in Transaction model
+        // BUG 5 FIX: reference doesn't exist — stored in metadata
+        balanceBefore: 0,   // BUG 4 FIX: required field
+        balanceAfter:  0,   // BUG 4 FIX: required field
+        description:  `Refund for booking ${paymentRecord.booking.bookingNumber}`,
+        metadata:     { razorpayRefundId: refund.id, razorpayPaymentId: refund.payment_id },
       },
     }),
   ]);

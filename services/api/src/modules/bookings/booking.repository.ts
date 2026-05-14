@@ -2,7 +2,7 @@ import { db } from '../../infrastructure/database';
 
 export const bookingRepo = {
 
-  // ─── CREATE ─────────────────────────────────────────────
+  // ─── CREATE ───────────────────────────────────────────────
 
   create: async (data: {
     userId: string;
@@ -24,11 +24,9 @@ export const bookingRepo = {
     commissionRate: number;
     userNotes?: string;
   }) => {
-    // Booking number generate karo — INS-2024-00001
     const count = await db.booking.count();
     const bookingNumber = `INS-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
 
-    // OTPs generate karo
     const startOtp = Math.floor(1000 + Math.random() * 9000).toString();
     const endOtp   = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -39,7 +37,6 @@ export const bookingRepo = {
         startOtp,
         endOtp,
         status: 'PENDING',
-        // Worker earning will be calculated after worker is assigned
         workerEarning: 0,
         commissionAmount: 0,
       },
@@ -53,7 +50,7 @@ export const bookingRepo = {
     });
   },
 
-  // ─── FIND ───────────────────────────────────────────────
+  // ─── FIND ─────────────────────────────────────────────────
 
   findById: async (id: string) => {
     return db.booking.findUnique({
@@ -77,16 +74,13 @@ export const bookingRepo = {
     return db.booking.findUnique({ where: { bookingNumber } });
   },
 
-  // ─── USER BOOKINGS ──────────────────────────────────────
+  // ─── USER BOOKINGS ────────────────────────────────────────
 
   getUserBookings: async (userId: string, params?: {
-    status?: string;
-    page?: number;
-    limit?: number;
+    status?: string; page?: number; limit?: number;
   }) => {
     const { status, page = 1, limit = 10 } = params ?? {};
     const skip = (page - 1) * limit;
-
     const where: any = { userId };
     if (status) where.status = status;
 
@@ -109,16 +103,13 @@ export const bookingRepo = {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   },
 
-  // ─── WORKER BOOKINGS ────────────────────────────────────
+  // ─── WORKER BOOKINGS ──────────────────────────────────────
 
   getWorkerBookings: async (workerId: string, params?: {
-    status?: string;
-    page?: number;
-    limit?: number;
+    status?: string; page?: number; limit?: number;
   }) => {
     const { status, page = 1, limit = 10 } = params ?? {};
     const skip = (page - 1) * limit;
-
     const where: any = { workerId };
     if (status) where.status = status;
 
@@ -129,7 +120,6 @@ export const bookingRepo = {
           user:    { select: { id: true, name: true, profilePhoto: true } },
           service: { select: { id: true, nameHi: true, nameEn: true, iconUrl: true } },
           address: { select: { flat: true, building: true, street: true, area: true, city: true, lat: true, lng: true } },
-          earning: { select: { finalAmount: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -141,7 +131,7 @@ export const bookingRepo = {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   },
 
-  // ─── STATUS UPDATE ──────────────────────────────────────
+  // ─── STATUS UPDATE ────────────────────────────────────────
 
   updateStatus: async (
     id: string,
@@ -153,43 +143,35 @@ export const bookingRepo = {
     const now = new Date();
     const timeFields: Record<string, Date> = {};
 
-    // Status ke hisaab se timestamp set karo
-    if (status === 'ASSIGNED')          timeFields.assignedAt        = now;
-    if (status === 'WORKER_ACCEPTED')   timeFields.workerAcceptedAt  = now;
-    if (status === 'WORKER_ARRIVED')    timeFields.workerArrivedAt   = now;
-    if (status === 'WORK_STARTED')      timeFields.workStartedAt     = now;
-    if (status === 'WORK_COMPLETED')    timeFields.workCompletedAt   = now;
-    if (status === 'COMPLETED')         timeFields.completedAt       = now;
-    if (status.startsWith('CANCELLED')) timeFields.cancelledAt       = now;
+    if (status === 'ASSIGNED')          timeFields.assignedAt       = now;
+    if (status === 'WORKER_ACCEPTED')   timeFields.workerAcceptedAt = now;
+    if (status === 'WORKER_ARRIVED')    timeFields.workerArrivedAt  = now;
+    if (status === 'WORK_STARTED')      timeFields.workStartedAt    = now;
+    if (status === 'WORK_COMPLETED')    timeFields.workCompletedAt  = now;
+    if (status === 'COMPLETED')         timeFields.completedAt      = now;
+    if (status.startsWith('CANCELLED')) timeFields.cancelledAt      = now;
 
     const [booking] = await Promise.all([
-      // Booking update karo
       db.booking.update({
         where: { id },
         data: { status: status as any, ...timeFields, ...(extra ?? {}) },
       }),
-      // Timeline mein log karo
       db.bookingTimeline.create({
-        data: {
-          bookingId: id,
-          status: status as any,
-          actorId,
-          actorType,
-        },
+        data: { bookingId: id, status: status as any, actorId, actorType },
       }),
     ]);
 
     return booking;
   },
 
-  // ─── ASSIGN WORKER ──────────────────────────────────────
+  // ─── ASSIGN WORKER ────────────────────────────────────────
 
   assignWorker: async (bookingId: string, workerId: string, commissionRate: number) => {
     const booking = await db.booking.findUnique({ where: { id: bookingId } });
     if (!booking) throw { statusCode: 404, message: 'Booking nahi mili.' };
 
     const commissionAmount = Math.round(booking.finalAmount * (commissionRate / 100));
-    const workerEarning = booking.finalAmount - commissionAmount;
+    const workerEarning    = booking.finalAmount - commissionAmount;
 
     return db.booking.update({
       where: { id: bookingId },
@@ -204,7 +186,7 @@ export const bookingRepo = {
     });
   },
 
-  // ─── OTP VERIFY ─────────────────────────────────────────
+  // ─── OTP VERIFY ───────────────────────────────────────────
 
   verifyStartOtp: async (bookingId: string, otp: string) => {
     const booking = await db.booking.findUnique({ where: { id: bookingId } });
@@ -218,17 +200,63 @@ export const bookingRepo = {
   },
 
   verifyEndOtp: async (bookingId: string, otp: string) => {
-    const booking = await db.booking.findUnique({ where: { id: bookingId } });
+    const booking = await db.booking.findUnique({
+      where: { id: bookingId },
+      include: { service: { select: { categoryId: true } } },
+    });
     if (!booking) throw { statusCode: 404, message: 'Booking nahi mili.' };
     if (booking.endOtp !== otp) throw { statusCode: 400, code: 'WRONG_OTP', message: 'Galat OTP.' };
+    if (!booking.workerId) throw { statusCode: 400, message: 'Worker assign nahi hua.' };
 
-    return db.booking.update({
-      where: { id: bookingId },
-      data: { endOtpVerifiedAt: new Date(), status: 'WORK_COMPLETED', workCompletedAt: new Date() },
+    // Commission calculate karo — city-specific rule pehle, phir global
+    const commissionRule = await db.commissionRule.findFirst({
+      where: { isActive: true, OR: [{ cityId: booking.cityId }, { cityId: null }] },
+      orderBy: { cityId: 'desc' },
     });
+
+    const commissionRate   = commissionRule?.value ?? booking.commissionRate ?? 20;
+    const commissionAmount = Math.round(booking.finalAmount * commissionRate / 100);
+    const workerEarning    = booking.finalAmount - commissionAmount;
+
+    // Booking complete + earning record + worker stats — sab ek saath
+    const [updated] = await Promise.all([
+      db.booking.update({
+        where: { id: bookingId },
+        data: {
+          status:           'COMPLETED',
+          completedAt:      new Date(),
+          endOtpVerifiedAt: new Date(),
+          workCompletedAt:  new Date(),
+          commissionAmount,
+          commissionRate,
+          workerEarning,
+        },
+      }),
+      db.workerEarning.create({
+        data: {
+          workerId:     booking.workerId,
+          bookingId:    booking.id,
+          finalAmount:  booking.finalAmount,
+          grossAmount:  booking.finalAmount,
+          commission:   commissionAmount,
+          netAmount:    workerEarning,
+          bonusAmount:  0,
+          penaltyAmount: 0,
+        },
+      }).catch(() => {}),
+      db.worker.update({
+        where: { id: booking.workerId },
+        data: {
+          completedJobs: { increment: 1 },
+          totalEarned: { increment: workerEarning },
+        },
+      }).catch(() => {}),
+    ]);
+
+    return updated;
   },
 
-  // ─── CANCEL ─────────────────────────────────────────────
+  // ─── CANCEL ───────────────────────────────────────────────
 
   cancel: async (bookingId: string, reason: string, cancelledById: string, cancelledByRole: string) => {
     const status = cancelledByRole === 'user'
@@ -249,7 +277,7 @@ export const bookingRepo = {
     });
   },
 
-  // ─── PHOTOS ─────────────────────────────────────────────
+  // ─── PHOTOS ───────────────────────────────────────────────
 
   addPhoto: async (bookingId: string, type: string, url: string, uploadedById: string, uploadedByType: string, caption?: string) => {
     return db.bookingPhoto.create({
@@ -264,24 +292,16 @@ export const bookingRepo = {
     });
   },
 
-  // ─── REVIEW ─────────────────────────────────────────────
+  // ─── REVIEW ───────────────────────────────────────────────
 
   createReview: async (data: {
-    bookingId: string;
-    workerId: string;
-    reviewerId: string;
-    rating: number;
-    comment?: string;
-    tags?: string[];
+    bookingId: string; workerId: string; reviewerId: string;
+    rating: number; comment?: string; tags?: string[];
   }) => {
     const review = await db.review.create({
-      data: {
-        ...data,
-        targetType: 'USER_TO_WORKER',
-      },
+      data: { ...data, targetType: 'USER_TO_WORKER' },
     });
 
-    // Worker ka rating update karo
     const allReviews = await db.review.findMany({
       where: { workerId: data.workerId, isVisible: true },
       select: { rating: true },
@@ -293,24 +313,19 @@ export const bookingRepo = {
       data: {
         rating: Math.round(avgRating * 10) / 10,
         totalReviews: allReviews.length,
-        consecutiveFiveStars: data.rating === 5
-          ? { increment: 1 }
-          : 0,
+        consecutiveFiveStars: data.rating === 5 ? { increment: 1 } : 0,
       },
     });
 
     return review;
   },
 
-  // ─── SOS ────────────────────────────────────────────────
+  // ─── SOS ──────────────────────────────────────────────────
 
   createSos: async (bookingId: string, triggeredBy: string, userId?: string, workerId?: string, lat?: number, lng?: number, description?: string) => {
     return db.sosIncident.create({
       data: {
-        bookingId,
-        triggeredBy,
-        userId,
-        workerId,
+        bookingId, triggeredBy, userId, workerId,
         status: 'ACTIVE',
         lat: lat ?? 0,
         lng: lng ?? 0,
@@ -319,15 +334,13 @@ export const bookingRepo = {
     });
   },
 
-  // ─── ACTIVE BOOKING CHECK ───────────────────────────────
+  // ─── ACTIVE BOOKING CHECK ─────────────────────────────────
 
   getUserActiveBooking: async (userId: string) => {
     return db.booking.findFirst({
       where: {
         userId,
-        status: {
-          notIn: ['COMPLETED', 'CANCELLED_BY_USER', 'CANCELLED_BY_WORKER', 'CANCELLED_BY_ADMIN', 'NO_WORKER_FOUND'],
-        },
+        status: { notIn: ['COMPLETED', 'CANCELLED_BY_USER', 'CANCELLED_BY_WORKER', 'CANCELLED_BY_ADMIN', 'NO_WORKER_FOUND'] },
       },
     });
   },
@@ -336,9 +349,7 @@ export const bookingRepo = {
     return db.booking.findFirst({
       where: {
         workerId,
-        status: {
-          notIn: ['COMPLETED', 'CANCELLED_BY_USER', 'CANCELLED_BY_WORKER', 'CANCELLED_BY_ADMIN', 'NO_WORKER_FOUND'],
-        },
+        status: { notIn: ['COMPLETED', 'CANCELLED_BY_USER', 'CANCELLED_BY_WORKER', 'CANCELLED_BY_ADMIN', 'NO_WORKER_FOUND'] },
       },
     });
   },

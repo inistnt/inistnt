@@ -50,7 +50,7 @@ export const workerRepo = {
   },
 
   updateStatus: async (id: string, data: {
-    status?: string;
+    status?: any;
     isOnline?: boolean;
     onlineSince?: Date | null;
   }) => {
@@ -225,7 +225,7 @@ export const workerRepo = {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   },
 
-  // ─── SUBSCRIPTION ────────────────────────────────────────
+  // ─── SUBSCRIPTION ────────────────────────────────────────c
 
   getSubscription: async (workerId: string) => {
     return db.workerSubscription.findUnique({ where: { workerId } });
@@ -318,4 +318,56 @@ export const workerRepo = {
       },
     });
   },
+
+  // ─── LOCATION ───────────────────────────────────────────
+  updateLocation: async (workerId: string, lat: number, lng: number, accuracy?: number) => {
+    // Redis mein bhi save karo for realtime tracking
+    await db.workerLocationHistory.create({
+      data: { workerId, lat, lng, accuracy: accuracy ?? 0 },
+    });
+    
+    await db.workerLiveLocation.upsert({
+      where: { workerId },
+      create: { workerId, lat, lng, accuracy: accuracy ?? 0 },
+      update: { lat, lng, accuracy: accuracy ?? 0 },
+    });
+
+    return db.worker.update({
+      where: { id: workerId },
+      data: { lastActiveAt: new Date() },
+    });
+  },
+
+    // ─── REQUEST PAYOUT ─────────────────────────────────────
+    requestPayout: async (workerId: string, amount: number, payoutMethod: string) => {
+      const worker = await db.worker.findUnique({
+        where: { id: workerId },
+        select: { walletBalance: true, pendingPayout: true, bankAccountNo: true, bankIfsc: true, upiId: true },
+      });
+      if (!worker) throw { statusCode: 404, message: 'Worker nahi mila.' };
+
+      const available = worker.walletBalance - worker.pendingPayout;
+      if (amount < 10000) throw { statusCode: 400, code: 'MIN_AMOUNT', message: 'Minimum payout ₹100 hai.' };
+      if (available < amount) throw { statusCode: 400, code: 'INSUFFICIENT_BALANCE', message: `Available balance ₹${available / 100} hai.` };
+
+      if (payoutMethod === 'upi' && !worker.upiId) {
+        throw { statusCode: 400, code: 'MISSING_UPI', message: 'UPI ID set nahi hai. Profile mein add karein.' };
+      }
+      if (payoutMethod === 'bank' && (!worker.bankAccountNo || !worker.bankIfsc)) {
+        throw { statusCode: 400, code: 'MISSING_BANK', message: 'Bank details set nahi hain. Profile mein add karein.' };
+      }
+
+      const payout = await db.workerPayout.create({
+        data: { workerId, amount, payoutMethod, status: 'PENDING' },
+      });
+
+      // Mark as pending so available balance reduces immediately
+      await db.worker.update({
+        where: { id: workerId },
+        data: { pendingPayout: { increment: amount } },
+      });
+
+      return payout;
+    },
 };
+

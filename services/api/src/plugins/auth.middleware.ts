@@ -162,3 +162,31 @@ export async function optionalAuth(
     role: payload.role,
   };
 }
+
+// ──────────────────────────────────────────────────────────
+// REQUIRE PERMISSION — Granular permission check
+// Usage: requirePermission('manage:workers')
+// SuperAdmin always passes.
+// ──────────────────────────────────────────────────────────
+
+import { hasPermission, type Permission } from '../modules/superadmin/permissions.config';
+
+export function requirePermission(permission: Permission) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    await requireStaff(request, reply);
+    if (reply.sent) return;
+
+    const { role, permissions } = request.currentUser as any;
+    const allowed = hasPermission(role ?? '', permissions ?? null, permission);
+
+    if (!allowed) {
+      return reply.status(403).send({
+        success: false,
+        error: {
+          code:    'PERMISSION_DENIED',
+          message: `Aapke paas '${permission}' permission nahi hai.`,
+        },
+      });
+    }
+  };
+}

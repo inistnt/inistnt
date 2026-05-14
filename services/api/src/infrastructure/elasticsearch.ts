@@ -1,278 +1,194 @@
+// ═══════════════════════════════════════════════════════════════════
+// INISTNT — Elasticsearch Service
+//
+// Indices:
+//   inistnt_services — service catalog search + autocomplete
+//   inistnt_workers  — worker search (name, skills, city, rating)
+//   inistnt_bookings — admin booking search (full-text on bookingNumber, notes)
+//
+// Install: pnpm add @elastic/elasticsearch
+// ═══════════════════════════════════════════════════════════════════
+
 import { Client } from '@elastic/elasticsearch';
-import { config } from '../config';
+import { db }     from '../../infrastructure/database';
+import { logger } from '../../config/logger';
 
-// ─────────────────────────────────────────────────────────────
-// ELASTICSEARCH CLIENT
-// ─────────────────────────────────────────────────────────────
+// ─── CLIENT ───────────────────────────────────────────────────────
+let esClient: Client | null = null;
 
-export const es = new Client({
-  node: config.ELASTICSEARCH_URL ?? 'http://localhost:9200',
-});
+export function getEsClient(): Client {
+  if (!esClient) {
+    const url = process.env.ELASTICSEARCH_URL ?? 'http://localhost:9200';
+    esClient = new Client({ node: url });
+  }
+  return esClient;
+}
 
-export const ES_INDEX = {
-  WORKERS:  'inistnt_workers',
-  SERVICES: 'inistnt_services',
-} as const;
+const PREFIX = process.env.ELASTICSEARCH_INDEX_PREFIX ?? 'inistnt_';
 
-// ─── INDEX MAPPING ────────────────────────────────────────────
+export const INDICES = {
+  SERVICES: `${PREFIX}services`,
+  WORKERS:  `${PREFIX}workers`,
+  BOOKINGS: `${PREFIX}bookings`,
+};
 
-export async function createWorkerIndex() {
-  const exists = await es.indices.exists({ index: ES_INDEX.WORKERS });
-  if (exists) return;
+// ─── INDEX SETUP (run once on startup) ────────────────────────────
+export async function ensureIndices(): Promise<void> {
+  const client = getEsClient();
 
-  await es.indices.create({
-    index: ES_INDEX.WORKERS,
-    body: {
-      settings: {
-        number_of_shards:   1,
-        number_of_replicas: 0,
-        analysis: {
-          analyzer: {
-            hindi_english: {
-              type:      'custom',
-              tokenizer: 'standard',
-              filter:    ['lowercase', 'asciifolding'],
+  // Services index
+  const servicesExists = await client.indices.exists({ index: INDICES.SERVICES });
+  if (!servicesExists) {
+    await client.indices.create({
+      index: INDICES.SERVICES,
+      body: {
+        settings: {
+          analysis: {
+            analyzer: {
+              hindi_english: {
+                type:      'custom',
+                tokenizer: 'standard',
+                filter:    ['lowercase', 'stop', 'asciifolding'],
+              },
             },
           },
         },
-      },
-      mappings: {
-        properties: {
-          id:                     { type: 'keyword' },
-          name:                   { type: 'text', analyzer: 'hindi_english' },
-          mobile:                 { type: 'keyword' },
-          cityId:                 { type: 'keyword' },
-          cityName:               { type: 'keyword' },
-          tier:                   { type: 'keyword' },
-          status:                 { type: 'keyword' },
-          isOnline:               { type: 'boolean' },
-          rating:                 { type: 'float' },
-          totalBookings:          { type: 'integer' },
-          acceptanceRate:         { type: 'float' },
-          uniformComplianceScore: { type: 'float' },
-          // Geo point for distance queries
-          location: { type: 'geo_point' },
-          // Skills / categories
-          skillCategoryIds:   { type: 'keyword' },
-          skillCategoryNames: { type: 'text' },
-          // Timestamps
-          lastLocationAt: { type: 'date' },
-          updatedAt:      { type: 'date' },
-        },
-      },
-    },
-  });
-
-  console.log(`[ES] ✅ Index created: ${ES_INDEX.WORKERS}`);
-}
-
-// ─── SYNC WORKER TO ES ────────────────────────────────────────
-
-export interface WorkerESDoc {
-  id:                     string;
-  name:                   string;
-  mobile:                 string;
-  cityId:                 string;
-  cityName:               string;
-  tier:                   string;
-  status:                 string;
-  isOnline:               boolean;
-  rating:                 number;
-  totalBookings:          number;
-  acceptanceRate:         number;
-  uniformComplianceScore: number;
-  location?:              { lat: number; lon: number };
-  skillCategoryIds:       string[];
-  skillCategoryNames:     string[];
-  lastLocationAt?:        string;
-  updatedAt:              string;
-}
-
-export async function upsertWorker(doc: WorkerESDoc): Promise<void> {
-  await es.index({
-    index: ES_INDEX.WORKERS,
-    id:    doc.id,
-    body:  doc,
-  });
-}
-
-export async function removeWorker(workerId: string): Promise<void> {
-  await es.delete({ index: ES_INDEX.WORKERS, id: workerId }).catch(() => {});
-}
-
-// ─── SEARCH NEARBY WORKERS ────────────────────────────────────
-
-export interface WorkerSearchParams {
-  lat:              number;
-  lng:              number;
-  radiusKm:         number;
-  categoryId?:      string;
-  cityId?:          string;
-  onlineOnly?:      boolean;
-  verifiedOnly?:    boolean;
-  tier?:            string;
-  minRating?:       number;
-  page?:            number;
-  limit?:           number;
-}
-
-export interface WorkerSearchResult {
-  workers: Array<WorkerESDoc & { distanceKm: number }>;
-  total:   number;
-}
-
-export async function searchNearbyWorkers(params: WorkerSearchParams): Promise<WorkerSearchResult> {
-  const {
-    lat, lng, radiusKm,
-    categoryId, cityId, onlineOnly = false, verifiedOnly = true,
-    tier, minRating,
-    page = 1, limit = 20,
-  } = params;
-
-  const must: any[]    = [];
-  const filter: any[]  = [];
-
-  // Geo distance filter
-  filter.push({
-    geo_distance: {
-      distance:  `${radiusKm}km`,
-      location:  { lat, lon: lng },
-    },
-  });
-
-  if (cityId)       filter.push({ term: { cityId } });
-  if (onlineOnly)   filter.push({ term: { isOnline: true } });
-  if (verifiedOnly) filter.push({ term: { status: 'VERIFIED' } });
-  if (tier)         filter.push({ term: { tier } });
-  if (categoryId)   filter.push({ term: { skillCategoryIds: categoryId } });
-  if (minRating)    filter.push({ range: { rating: { gte: minRating } } });
-
-  const result = await es.search({
-    index: ES_INDEX.WORKERS,
-    body: {
-      from: (page - 1) * limit,
-      size: limit,
-      query: {
-        bool: { must, filter },
-      },
-      sort: [
-        // Sort by score (rating + compliance) then distance
-        { rating:                 { order: 'desc' } },
-        { uniformComplianceScore: { order: 'desc' } },
-        {
-          _geo_distance: {
-            location:         { lat, lon: lng },
-            order:            'asc',
-            unit:             'km',
-            distance_type:    'arc',
+        mappings: {
+          properties: {
+            id:              { type: 'keyword' },
+            nameEn:          { type: 'text',    analyzer: 'hindi_english', fields: { keyword: { type: 'keyword' }, suggest: { type: 'completion' } } },
+            nameHi:          { type: 'text',    analyzer: 'hindi_english' },
+            descriptionEn:   { type: 'text',    analyzer: 'hindi_english' },
+            categoryId:      { type: 'keyword' },
+            categoryName:    { type: 'keyword' },
+            basePricePaise:  { type: 'integer' },
+            isActive:        { type: 'boolean' },
+            rating:          { type: 'float' },
+            bookingCount:    { type: 'integer' },
+            tags:            { type: 'keyword' },
           },
         },
-      ],
-      // Include distance in response
-      script_fields: {},
-    },
-  });
+      },
+    });
+    logger.info('[ES] Services index created');
+  }
 
-  const hits = result.hits.hits as any[];
-
-  const workers = hits.map(hit => ({
-    ...hit._source as WorkerESDoc,
-    distanceKm: hit.sort?.[2] ?? 0,
-  }));
-
-  return {
-    workers,
-    total: typeof result.hits.total === 'number'
-      ? result.hits.total
-      : (result.hits.total as any)?.value ?? 0,
-  };
+  // Workers index
+  const workersExists = await client.indices.exists({ index: INDICES.WORKERS });
+  if (!workersExists) {
+    await client.indices.create({
+      index: INDICES.WORKERS,
+      body: {
+        mappings: {
+          properties: {
+            id:           { type: 'keyword' },
+            name:         { type: 'text',    fields: { keyword: { type: 'keyword' } } },
+            mobile:       { type: 'keyword' },
+            status:       { type: 'keyword' },
+            tier:         { type: 'keyword' },
+            cityId:       { type: 'keyword' },
+            cityName:     { type: 'keyword' },
+            areaId:       { type: 'keyword' },
+            skills:       { type: 'keyword' },
+            rating:       { type: 'float' },
+            totalJobs:    { type: 'integer' },
+            isOnline:     { type: 'boolean' },
+            location:     { type: 'geo_point' },
+            updatedAt:    { type: 'date' },
+          },
+        },
+      },
+    });
+    logger.info('[ES] Workers index created');
+  }
 }
 
-// ─── FULL SYNC (run once or scheduled) ────────────────────────
+// ─── SYNC: Index a service ─────────────────────────────────────────
+export async function indexService(serviceId: string): Promise<void> {
+  const service = await db.service.findUnique({
+    where:   { id: serviceId },
+    include: { category: { select: { nameEn: true } } },
+  });
+  if (!service) return;
 
-export async function fullWorkerSync(db: any): Promise<number> {
-  await createWorkerIndex();
+  await getEsClient().index({
+    index: INDICES.SERVICES,
+    id:    service.id,
+    body: {
+      id:             service.id,
+      nameEn:         service.nameEn,
+      nameHi:         service.nameHi,
+      descriptionEn:  service.descriptionEn,
+      categoryId:     service.categoryId,
+      categoryName:   service.category?.nameEn,
+      basePricePaise: service.basePrice,
+      isActive:       service.isActive,
+      rating:         service.avgRating ?? 0,
+      bookingCount:   service.totalBookings ?? 0,
+      tags:           service.tags ?? [],
+    },
+  });
+}
 
-  const workers = await db.worker.findMany({
+// ─── SYNC: Index a worker ──────────────────────────────────────────
+export async function indexWorker(workerId: string): Promise<void> {
+  const worker = await db.worker.findUnique({
+    where:   { id: workerId },
     include: {
       city:   { select: { nameEn: true } },
-      skills: { include: { serviceCategory: { select: { nameEn: true } } } },
+      skills: { select: { serviceId: true } },
     },
   });
+  if (!worker) return;
 
-  let synced = 0;
-  const ops: any[] = [];
+  const doc: any = {
+    id:        worker.id,
+    name:      worker.name,
+    mobile:    worker.mobile,
+    status:    worker.status,
+    tier:      worker.tier,
+    cityId:    worker.cityId,
+    cityName:  worker.city?.nameEn,
+    areaId:    worker.areaId,
+    skills:    worker.skills.map(s => s.serviceId),
+    rating:    worker.rating ?? 0,
+    totalJobs: worker.totalJobs ?? 0,
+    isOnline:  worker.isOnline,
+    updatedAt: worker.updatedAt.toISOString(),
+  };
 
-  for (const w of workers) {
-    const doc: WorkerESDoc = {
-      id:                     w.id,
-      name:                   w.name,
-      mobile:                 w.mobile,
-      cityId:                 w.cityId,
-      cityName:               w.city?.nameEn ?? '',
-      tier:                   w.tier,
-      status:                 w.status,
-      isOnline:               w.isOnline,
-      rating:                 w.rating,
-      totalBookings:          w.totalBookings,
-      acceptanceRate:         w.acceptanceRate,
-      uniformComplianceScore: w.uniformComplianceScore,
-      skillCategoryIds:       w.skills.map((s: any) => s.serviceCategoryId),
-      skillCategoryNames:     w.skills.map((s: any) => s.serviceCategory.nameEn),
-      lastLocationAt:         w.lastLocationAt?.toISOString(),
-      updatedAt:              w.updatedAt.toISOString(),
-      ...(w.currentLat && w.currentLng && {
-        location: { lat: w.currentLat, lon: w.currentLng },
-      }),
-    };
-
-    ops.push({ index: { _index: ES_INDEX.WORKERS, _id: w.id } });
-    ops.push(doc);
-    synced++;
+  if (worker.currentLat && worker.currentLng) {
+    doc.location = { lat: worker.currentLat, lon: worker.currentLng };
   }
 
-  if (ops.length > 0) {
-    await es.bulk({ body: ops });
-    await es.indices.refresh({ index: ES_INDEX.WORKERS });
+  await getEsClient().index({ index: INDICES.WORKERS, id: worker.id, body: doc });
+}
+
+// ─── FULL REINDEX ──────────────────────────────────────────────────
+export async function fullReindex(type: 'services' | 'workers'): Promise<{ indexed: number }> {
+  let indexed = 0;
+  const batchSize = 100;
+
+  if (type === 'services') {
+    let skip = 0;
+    while (true) {
+      const services = await db.service.findMany({ take: batchSize, skip });
+      if (!services.length) break;
+      await Promise.all(services.map(s => indexService(s.id)));
+      indexed += services.length;
+      skip += batchSize;
+    }
+  } else {
+    let skip = 0;
+    while (true) {
+      const workers = await db.worker.findMany({ take: batchSize, skip });
+      if (!workers.length) break;
+      await Promise.all(workers.map(w => indexWorker(w.id)));
+      indexed += workers.length;
+      skip += batchSize;
+    }
   }
 
-  console.log(`[ES] ✅ Full sync complete: ${synced} workers`);
-  return synced;
-}
-
-// ─── UPDATE WORKER LOCATION (called on WORKER_LOCATION event) ─
-
-export async function updateWorkerLocation(
-  workerId: string,
-  lat: number,
-  lng: number,
-): Promise<void> {
-  await es.update({
-    index: ES_INDEX.WORKERS,
-    id:    workerId,
-    body: {
-      doc: {
-        location:       { lat, lon: lng },
-        lastLocationAt: new Date().toISOString(),
-        isOnline:       true,
-      },
-    },
-  }).catch(() => {}); // Worker may not be in ES yet
-}
-
-// ─── UPDATE WORKER STATUS ─────────────────────────────────────
-
-export async function updateWorkerStatus(
-  workerId: string,
-  isOnline: boolean,
-  status?: string,
-): Promise<void> {
-  const doc: any = { isOnline };
-  if (status) doc.status = status;
-
-  await es.update({
-    index: ES_INDEX.WORKERS,
-    id:    workerId,
-    body:  { doc },
-  }).catch(() => {});
+  logger.info({ type, indexed }, '[ES] Full reindex complete');
+  return { indexed };
 }

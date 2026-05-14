@@ -1,5 +1,5 @@
 {
-  "name": "@inistnt/api",
+  "name": "@inistnt/root",
   "version": "1.0.0",
   "description": "Inistnt Main API Service",
   "private": true,
@@ -40,6 +40,7 @@
     "firebase-admin": "^12.0.0",
     "ioredis": "^5.3.2",
     "kafkajs": "^2.2.4",
+    "node-cron": "^3.0.3",
     "nodemailer": "^6.9.8",
     "otplib": "^12.0.1",
     "pino": "^8.17.2",
@@ -47,11 +48,22 @@
     "razorpay": "^2.9.2",
     "zod": "^3.22.4"
   },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
+  },
   "devDependencies": {
-    "@types/bcryptjs": "^3.0.0",
+    "@faker-js/faker": "^10.4.0",
+    "@types/jest": "^30.0.0",
+    "@types/nock": "^11.1.0",
     "@types/node": "^20.10.0",
+    "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.14",
+    "ioredis-mock": "^8.13.1",
+    "jest": "^30.3.0",
+    "nock": "^14.0.14",
     "prisma": "^5.8.0",
+    "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

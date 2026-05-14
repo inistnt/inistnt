@@ -1,6 +1,7 @@
 import { sendPush }  from '../providers/fcm';
 import { sendSms }   from '../providers/sms';
 import { sendEmail } from '../providers/email';
+import { whatsapp }  from '../providers/whatsapp';
 import { getUserInfo, getWorkerInfo } from '../providers/db';
 import { logger }    from '../logger';
 
@@ -12,12 +13,15 @@ export interface NotificationSendEvent {
   fcmToken?:     string;
   mobile?:       string;
   email?:        string;
-  channels:      Array<'push' | 'sms' | 'email'>;
+  channels:      Array<'push' | 'sms' | 'email' | 'whatsapp'>;
   title?:        string;
   body:          string;
   deepLink?:     string;
   imageUrl?:     string;
   bookingId?:    string;
+  // WhatsApp-specific
+  whatsappTemplate?: string;
+  whatsappVars?:     string[];
   _meta?:        any;
 }
 
@@ -96,6 +100,25 @@ export async function handleNotificationSend(event: NotificationSendEvent): Prom
     }
   }
 
+  // ─── WHATSAPP ────────────────────────────────────────────────────────────
+
+  if (channels.includes('whatsapp')) {
+    if (mobile && event.whatsappTemplate && event.whatsappVars) {
+      const { sendWhatsApp } = await import('../providers/whatsapp');
+      results.whatsapp = await sendWhatsApp({
+        to:         mobile,
+        templateId: event.whatsappTemplate as any,
+        variables:  event.whatsappVars,
+      });
+    } else if (mobile) {
+      // Fallback: send body as SMS if no template specified
+      results.whatsapp = await sendSms(mobile, event.body);
+    } else {
+      logger.warn({ recipientId }, 'WhatsApp requested but no mobile available');
+      results.whatsapp = false;
+    }
+  }
+
   logger.info({
     recipientId,
     recipientType,
@@ -124,16 +147,18 @@ export async function handleBookingAssigned(event: BookingAssignedEvent): Promis
   // Notify user
   if (user) {
     await handleNotificationSend({
-      recipientType: 'user',
-      recipientId:   event.userId,
-      fcmToken:      user.fcmToken,
-      mobile:        user.mobile,
-      email:         user.email,
-      channels:      ['push', 'sms'],
-      title:         '✅ Worker mil gaya!',
-      body:          `${worker?.name ?? 'Worker'} aa rahe hain — ~${event.estimatedArrivalMin} min mein pahunchenge.`,
-      deepLink:      `inistnt://booking/${event.bookingId}/track`,
-      bookingId:     event.bookingId,
+      recipientType:    'user',
+      recipientId:      event.userId,
+      fcmToken:         user.fcmToken,
+      mobile:           user.mobile,
+      email:            user.email,
+      channels:         ['push', 'sms', 'whatsapp'],
+      title:            '✅ Worker mil gaya!',
+      body:             `${worker?.name ?? 'Worker'} aa rahe hain — ~${event.estimatedArrivalMin} min mein pahunchenge.`,
+      deepLink:         `inistnt://booking/${event.bookingId}/track`,
+      bookingId:        event.bookingId,
+      whatsappTemplate: 'worker_assigned',
+      whatsappVars:     [worker?.name ?? 'Worker', `${event.estimatedArrivalMin} min`, event.bookingId, worker?.mobile ?? ''],
     });
   }
 
@@ -166,16 +191,18 @@ export async function handleBookingCompleted(event: BookingCompletedEvent): Prom
   if (!user) return;
 
   await handleNotificationSend({
-    recipientType: 'user',
-    recipientId:   event.userId,
-    fcmToken:      user.fcmToken,
-    mobile:        user.mobile,
-    email:         user.email,
-    channels:      ['push', 'email'],
-    title:         '⭐ Service complete! Rating dein',
-    body:          `Aapki service complete ho gayi. ₹${event.amount / 100} charge hua. Kaisi rahi service?`,
-    deepLink:      `inistnt://booking/${event.bookingId}/review`,
-    bookingId:     event.bookingId,
+    recipientType:    'user',
+    recipientId:      event.userId,
+    fcmToken:         user.fcmToken,
+    mobile:           user.mobile,
+    email:            user.email,
+    channels:         ['push', 'email', 'whatsapp'],
+    title:            '⭐ Service complete! Rating dein',
+    body:             `Aapki service complete ho gayi. ₹${event.amount / 100} charge hua. Kaisi rahi service?`,
+    deepLink:         `inistnt://booking/${event.bookingId}/review`,
+    bookingId:        event.bookingId,
+    whatsappTemplate: 'booking_completed',
+    whatsappVars:     [event.bookingId, String(event.amount / 100), `https://app.inistnt.com/review/${event.bookingId}`],
   });
 }
 

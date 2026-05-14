@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireUser } from '../../plugins/auth.middleware';
-import { createOrder, verifyPayment, handleWebhook, getPaymentStatus } from './payment.controller';
+import { createOrder, verifyPayment, getPaymentStatus } from './payment.controller';
+import { handleRazorpayWebhook } from './payment.webhook';
 
 function wrap(fn: Function) {
   return async (req: any, rep: any) => {
@@ -28,7 +29,7 @@ export async function paymentRoutes(server: FastifyInstance) {
   }, wrap(verifyPayment));
 
   // POST /api/v1/payments/webhook — Razorpay calls this directly (no auth)
-  server.post('/webhook', wrap(handleWebhook));
+  server.post('/webhook', wrap(handleRazorpayWebhook));
 
   // GET /api/v1/payments/:bookingId
   server.get('/:bookingId', { preHandler: requireUser }, wrap(getPaymentStatus));

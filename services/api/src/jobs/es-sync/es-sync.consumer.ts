@@ -113,22 +113,19 @@ async function syncFullWorker(workerId: string) {
     id:                     w.id,
     name:                   w.name,
     mobile:                 w.mobile,
-    cityId:                 w.cityId,
+    cityId:                 w.cityId  ?? '',        // String? in schema — null-coalesce to ''
     cityName:               w.city?.nameEn ?? '',
     tier:                   w.tier,
     status:                 w.status,
     isOnline:               w.isOnline,
     rating:                 w.rating,
-    totalBookings:          w.totalBookings,
     acceptanceRate:         w.acceptanceRate,
     uniformComplianceScore: w.uniformComplianceScore,
     skillCategoryIds:       w.skills.map((s: any) => s.serviceCategoryId),
     skillCategoryNames:     w.skills.map((s: any) => s.serviceCategory.nameEn),
-    lastLocationAt:         w.lastLocationAt?.toISOString(),
+    totalJobs:              w.totalJobs ?? 0,
     updatedAt:              w.updatedAt.toISOString(),
-    ...(w.currentLat && w.currentLng && {
-      location: { lat: w.currentLat, lon: w.currentLng },
-    }),
+    // Worker's real-time location is tracked in Redis by location-service, not stored in DB
   });
   logger.debug({ workerId }, '[ES] Worker synced');
 }

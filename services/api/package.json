@@ -11,7 +11,7 @@
     "db:migrate:prod": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "npx tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force"
   },
   "dependencies": {
@@ -32,27 +32,31 @@
     "@inistnt/utils": "workspace:*",
     "@inistnt/validators": "workspace:*",
     "@prisma/client": "^5.8.0",
-    "argon2": "^0.31.2",
     "axios": "^1.6.5",
-    "bcryptjs": "^3.0.3",
+    "bcryptjs": "^2.4.3",
     "bullmq": "^5.1.1",
     "dayjs": "^1.11.10",
-    "dotenv": "^17.3.1",
+    "dotenv": "^17.4.2",
     "fastify": "^4.25.2",
     "firebase-admin": "^12.0.0",
+    "groq-sdk": "^0.7.0",
     "ioredis": "^5.3.2",
     "kafkajs": "^2.2.4",
-    "nodemailer": "^6.9.8",
+    "node-cron": "^3.0.3",
     "otplib": "^12.0.1",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
     "razorpay": "^2.9.2",
+    "resend": "^3.2.0",
     "zod": "^3.22.4"
   },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
+  },
   "devDependencies": {
-    "@types/bcryptjs": "^3.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.10.0",
-    "@types/nodemailer": "^6.4.14",
+    "@types/node-cron": "^3.0.11",
     "prisma": "^5.8.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"

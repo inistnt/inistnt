@@ -110,25 +110,48 @@ export const userProfileRepo = {
     lat: number;
     lng: number;
   }>) => {
-    return db.address.update({
-      where: { id },
+    const result = await db.address.updateMany({
+      where: { id, userId },
       data,
     });
+
+    if (result.count === 0) {
+      throw { statusCode: 404, code: 'NOT_FOUND', message: 'Address nahi mila.' };
+    }
+
+    return db.address.findFirst({ where: { id, userId } });
   },
 
   deleteAddress: async (id: string, userId: string) => {
-    return db.address.delete({ where: { id } });
+    const result = await db.address.deleteMany({
+      where: { id, userId },
+    });
+
+    if (result.count === 0) {
+      throw { statusCode: 404, code: 'NOT_FOUND', message: 'Address nahi mila.' };
+    }
+
+    return result;
   },
 
   setDefaultAddress: async (id: string, userId: string) => {
-    await db.address.updateMany({
-      where: { userId },
-      data: { isDefault: false },
-    });
-    return db.address.update({
-      where: { id },
-      data: { isDefault: true },
-    });
+    const target = await db.address.findFirst({ where: { id, userId }, select: { id: true } });
+    if (!target) {
+      throw { statusCode: 404, code: 'NOT_FOUND', message: 'Address nahi mila.' };
+    }
+
+    await db.$transaction([
+      db.address.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      }),
+      db.address.updateMany({
+        where: { id, userId },
+        data: { isDefault: true },
+      }),
+    ]);
+
+    return db.address.findFirst({ where: { id, userId } });
   },
 
   // ─── Loyalty ──────────────────────────────────────────
