@@ -1,7 +1,7 @@
 <!-- Please save the logo you uploaded to the root of your project as 'logo.png' (or 'docs/logo.png') so the image tag below can render it! -->
 
 <div align="center">
-  <img src="./docs/logo.png" alt="Inistnt Logo" width="250" />
+  <img src="./docs/inistntlogo.png" alt="Inistnt Logo" width="250" />
 
   <h1>🚀 Inistnt — The On-Demand Gig Economy Platform</h1>
   
