@@ -89,27 +89,27 @@ graph TD
 
     %% Components
     subgraph Clients ["Client Layer (Apps)"]
-        CustomerApp[("📱 Customer App\n(React Native)")]:::client
-        WorkerApp[("📱 Worker App\n(React Native)")]:::client
-        AdminWeb[("💻 Admin Dashboard\n(Next.js)")]:::client
+        CustomerApp[("📱 Customer App<br/>(React Native)")]:::client
+        WorkerApp[("📱 Worker App<br/>(React Native)")]:::client
+        AdminWeb[("💻 Admin Dashboard<br/>(Next.js)")]:::client
     end
 
     subgraph API_Gateway ["API Gateway & Compute Layer"]
-        FastifyAPI["🚀 Core Fastify API\n(REST / WebSockets)"]:::backend
-        BullMQWorker["⚙️ Background Workers\n(BullMQ)"]:::backend
+        FastifyAPI["🚀 Core Fastify API<br/>(REST / WebSockets)"]:::backend
+        BullMQWorker["⚙️ Background Workers<br/>(BullMQ)"]:::backend
     end
 
     subgraph Data_Layer ["State & Storage Layer"]
-        Postgres[(("🐘 PostgreSQL 16\n(Primary DB)"))]:::db
-        Redis[(("⚡ Redis\n(Cache & Geo)"))]:::db
-        S3[(("☁️ AWS S3\n(Media Storage)"))]:::db
+        Postgres[("🐘 PostgreSQL 16<br/>(Primary DB)")]:::db
+        Redis[("⚡ Redis<br/>(Cache & Geo)")]:::db
+        S3[("☁️ AWS S3<br/>(Media Storage)")]:::db
     end
 
     subgraph External ["External Third-Party APIs"]
-        Razorpay["💳 Razorpay\n(Payment Collection)"]:::external
-        Cashfree["💸 Cashfree\n(Worker Payouts)"]:::external
-        FCM["🔔 Firebase FCM\n(Push Notifications)"]:::external
-        SMS["📲 SMS Gateway\n(OTP & Comms)"]:::external
+        Razorpay["💳 Razorpay<br/>(Payment Collection)"]:::external
+        Cashfree["💸 Cashfree<br/>(Worker Payouts)"]:::external
+        FCM["🔔 Firebase FCM<br/>(Push Notifications)"]:::external
+        SMS["📲 SMS Gateway<br/>(OTP & Comms)"]:::external
     end
 
     %% Routing
