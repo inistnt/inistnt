@@ -41,6 +41,7 @@ export const db = {
   payment:        createModelMock(),
   workerEarning:  createModelMock(),
   payout:         createModelMock(),
+  workerPayout:   createModelMock(),
 
   // Finance models
   coupon:         createModelMock(),
@@ -59,6 +60,7 @@ export const db = {
   chatMessage:    createModelMock(),
   auditLog:       createModelMock(),
   subscription:   createModelMock(),
+  workerSubscription: createModelMock(),
   trainingModule: createModelMock(),
 
   // Prisma methods

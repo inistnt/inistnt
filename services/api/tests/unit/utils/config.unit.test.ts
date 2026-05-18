@@ -2,6 +2,8 @@
 // UNIT TESTS — Config helpers & RedisKeys
 // ═══════════════════════════════════════════════════════════
 
+import { cache, flushTestRedis, redis, RedisKeys } from '../../mocks/redis.mock';
+
 describe('Config helpers', () => {
 
   // Test the `required()` function logic inline
@@ -80,8 +82,6 @@ describe('Config helpers', () => {
 // ─── REDIS KEYS ────────────────────────────────────────────
 
 describe('RedisKeys', () => {
-  const { RedisKeys } = require('../../mocks/redis.mock');
-
   it('otp() generates correct key', () => {
     expect(RedisKeys.otp('9876543210', 'login')).toBe('otp:9876543210:login');
   });
@@ -126,8 +126,6 @@ describe('RedisKeys', () => {
 // ─── CACHE HELPER ──────────────────────────────────────────
 
 describe('cache helper', () => {
-  const { cache, flushTestRedis } = require('../../mocks/redis.mock');
-
   beforeEach(async () => {
     await flushTestRedis();
   });
@@ -157,7 +155,6 @@ describe('cache helper', () => {
   });
 
   it('handles invalid JSON gracefully (returns null)', async () => {
-    const { redis } = require('../../mocks/redis.mock');
     await redis.set('bad-json-key', 'not-valid-json{{{');
     const result = await cache.get('bad-json-key');
     expect(result).toBeNull();

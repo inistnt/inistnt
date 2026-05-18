@@ -32,7 +32,7 @@ export function makeUserSession(userId: string, overrides: Partial<Record<string
   return {
     id:           faker.string.uuid(),
     userId,
-    refreshToken: faker.string.hex(64),
+    refreshToken: faker.string.hexadecimal({ length: 64 }),
     deviceId:     faker.string.uuid(),
     deviceOs:     'android',
     ipAddress:    faker.internet.ip(),
@@ -77,7 +77,7 @@ export function makeWorkerSession(workerId: string, overrides: Partial<Record<st
   return {
     id:           faker.string.uuid(),
     workerId,
-    refreshToken: faker.string.hex(64),
+    refreshToken: faker.string.hexadecimal({ length: 64 }),
     deviceId:     faker.string.uuid(),
     deviceOs:     'android',
     isActive:     true,
