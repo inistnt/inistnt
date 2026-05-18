@@ -1,241 +1,359 @@
+<!-- Please save the logo you uploaded to the root of your project as 'logo.png' (or 'docs/logo.png') so the image tag below can render it! -->
+
 <div align="center">
-  <h1>🚀 Inistnt Platform Architecture & SRS</h1>
-  <p><strong>Comprehensive Software Requirements Specification, Architecture, and Dataflow Documentation</strong></p>
+  <img src="./docs/logo.png" alt="Inistnt Logo" width="250" />
+
+  <h1>🚀 Inistnt — The On-Demand Gig Economy Platform</h1>
+  
+  <p><strong>A hyper-scalable, full-stack monorepo for matching customers with verified service professionals in real-time.</strong></p>
+
+  <!-- Shields/Badges -->
+  <p>
+    <img src="https://img.shields.io/badge/Monorepo-Turborepo-EF4444?style=for-the-badge&logo=turborepo" alt="Turborepo" />
+    <img src="https://img.shields.io/badge/Backend-Fastify-000000?style=for-the-badge&logo=fastify" alt="Fastify" />
+    <img src="https://img.shields.io/badge/Database-PostgreSQL_16-4169E1?style=for-the-badge&logo=postgresql" alt="PostgreSQL" />
+    <img src="https://img.shields.io/badge/ORM-Prisma-2D3748?style=for-the-badge&logo=prisma" alt="Prisma" />
+    <img src="https://img.shields.io/badge/Mobile-React_Native-61DAFB?style=for-the-badge&logo=react" alt="React Native" />
+  </p>
 </div>
 
 ---
 
-## 📖 1. Executive Summary
-
-**Inistnt** is a scalable, on-demand gig-worker platform designed to seamlessly connect customers with verified service professionals. Built with modern web technologies, the platform handles end-to-end service lifecycles including **instant/scheduled booking matching, live worker tracking, complex commission logic, tax deductions (TDS), and automated wallet payouts**.
-
-The project is structured as a **Turborepo Monorepo** encompassing multiple client applications backed by a high-performance **Fastify + Prisma API**.
-
----
-
-## 🏗️ 2. Monorepo Structure & Tech Stack
-
-### 📂 Workspaces
-- **`apps/mobile-customer`**: React Native / Expo app for end-users to book services.
-- **`apps/mobile-worker`**: React Native / Expo app for gig-workers to accept jobs and track earnings.
-- **`apps/web-admin`**: React/Next.js dashboard for platform administrators and managers.
-- **`apps/web-customer`**: Consumer-facing web portal for booking and tracking.
-- **`apps/web-support`**: Internal tool for support agents to handle tickets, SOS incidents, and disputes.
-- **`services/api`**: The core Fastify backend service powering the entire platform.
-- **`packages/*`**: Shared libraries including `api-client`, `ui`, `validators`, `constants`, and `types`.
-
-### ⚙️ Core Technology Stack
-- **Backend Framework**: [Fastify](https://www.fastify.io/)
-- **Database ORM**: [Prisma](https://www.prisma.io/)
-- **Primary Database**: PostgreSQL 16
-- **Caching & Live Data**: Redis (ioredis)
-- **Analytics (Optional)**: ClickHouse & Elasticsearch
-- **Payments & Payouts**: Razorpay (Collection), Cashfree (Payouts)
-- **Queues & Background Jobs**: BullMQ & KafkaJS
+## 📋 Table of Contents
+1. [Platform Overview](#-platform-overview)
+2. [Key Features](#-key-features)
+3. [Monorepo Architecture](#-monorepo-architecture)
+4. [System Architecture (C4 Model)](#-system-architecture-c4-model)
+5. [Database Schema (ER Diagram)](#-database-schema-er-diagram)
+6. [Core Business Flows](#-core-business-flows)
+    - [Booking & Fulfillment Lifecycle](#a-booking--fulfillment-lifecycle)
+    - [Financial Engine & TDS Payouts](#b-financial-engine--tds-payouts)
+7. [Tech Stack Details](#-tech-stack-details)
+8. [Local Development](#-local-development)
 
 ---
 
-## 📊 3. High-Level System Architecture
+## 🌍 Platform Overview
 
-The following diagram illustrates how the client applications communicate with the backend services and external providers.
+**Inistnt** is an industry-grade platform designed to revolutionize the home and gig-services industry. By utilizing high-frequency geo-spatial matching, secure automated payments, and strict compliance monitoring (e.g., automated TDS deductions, identity verification), Inistnt provides a frictionless experience for both **Customers** (seeking services) and **Workers** (seeking earning opportunities).
+
+---
+
+## ✨ Key Features
+
+| 🧑‍💼 For Customers | 🛠️ For Workers | 🛡️ For Administrators |
+| :--- | :--- | :--- |
+| **Instant & Scheduled Bookings** | **Live Job Radar** via Redis Geo-hashing | **Dynamic Surge Pricing** Control |
+| **Real-time Tracking** of Worker ETA | **Automated Payouts** (Cashfree API) | **Commission Rule Engine** |
+| **Secure OTP Verification** for job start | **Digital Wallets & Earnings Ledger** | **Fraud & Anomaly Detection** |
+| **Seamless Payments** via Razorpay | **TDS Tax Compliance Automation** | **Worker Compliance Management** |
+| **Multi-tier Service Catalogs** | **Loyalty & Reward Programs** | **Dispute & SOS Escalations** |
+
+---
+
+## 🏗️ Monorepo Architecture
+
+The project is structured as a **Turborepo** to maximize code-sharing, ensure strict type safety across the stack, and accelerate build times.
+
+```bash
+inistnt/
+├── apps/
+│   ├── mobile-customer/  # React Native (Expo) app for end-users
+│   ├── mobile-worker/    # React Native (Expo) app for gig workers
+│   ├── web-customer/     # Next.js consumer web portal
+│   ├── web-admin/        # Next.js CMS & operations dashboard
+│   └── web-support/      # Internal portal for ticket/SOS resolution
+├── services/
+│   └── api/              # Core Fastify API (Business Logic, DB, Auth)
+└── packages/
+    ├── api-client/       # Shared Axios/tRPC client definitions
+    ├── constants/        # Shared enums, configs, and mappings
+    ├── types/            # Shared TypeScript interfaces
+    ├── ui/               # Shared React UI components (Design System)
+    └── validators/       # Zod schemas for cross-stack validation
+```
+
+---
+
+## 🧩 System Architecture (C4 Model)
+
+The following diagram represents the Container-level architecture of the Inistnt platform, showcasing how user-facing interfaces interact with backend services, databases, and external providers.
 
 ```mermaid
 graph TD
-    %% Clients
-    subgraph Clients ["Client Applications"]
-        MC[Mobile Customer App]
-        MW[Mobile Worker App]
-        WA[Web Admin Dashboard]
-        WS[Web Support Portal]
+    %% Styling
+    classDef client fill:#0ea5e9,stroke:#0284c7,stroke-width:2px,color:#fff
+    classDef backend fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    classDef db fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    classDef external fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+
+    %% Components
+    subgraph Clients ["Client Layer (Apps)"]
+        CustomerApp[("📱 Customer App\n(React Native)")]:::client
+        WorkerApp[("📱 Worker App\n(React Native)")]:::client
+        AdminWeb[("💻 Admin Dashboard\n(Next.js)")]:::client
     end
 
-    %% API Layer
-    subgraph API ["Inistnt Core API (Fastify)"]
-        Router[API Router & Auth]
-        Modules[Business Logic Modules]
-        BullMQ[BullMQ Job Processor]
+    subgraph API_Gateway ["API Gateway & Compute Layer"]
+        FastifyAPI["🚀 Core Fastify API\n(REST / WebSockets)"]:::backend
+        BullMQWorker["⚙️ Background Workers\n(BullMQ)"]:::backend
     end
 
-    %% Data Layer
-    subgraph Data ["Data & Storage Layer"]
-        PG[(PostgreSQL 16)]
-        Redis[(Redis Cache / PubSub)]
-        S3[AWS S3 - Documents & Media]
+    subgraph Data_Layer ["State & Storage Layer"]
+        Postgres[(("🐘 PostgreSQL 16\n(Primary DB)"))]:::db
+        Redis[(("⚡ Redis\n(Cache & Geo)"))]:::db
+        S3[(("☁️ AWS S3\n(Media Storage)"))]:::db
     end
 
-    %% External Services
-    subgraph ThirdParty ["External Integrations"]
-        Razorpay[Razorpay - Payments]
-        Cashfree[Cashfree - Payouts]
-        FCM[Firebase Cloud Messaging]
-        SMS[SMS Gateway / Resend]
+    subgraph External ["External Third-Party APIs"]
+        Razorpay["💳 Razorpay\n(Payment Collection)"]:::external
+        Cashfree["💸 Cashfree\n(Worker Payouts)"]:::external
+        FCM["🔔 Firebase FCM\n(Push Notifications)"]:::external
+        SMS["📲 SMS Gateway\n(OTP & Comms)"]:::external
     end
 
-    %% Connections
-    Clients -->|HTTPS / WSS| Router
-    Router --> Modules
-    Modules <--> PG
-    Modules <--> Redis
-    Modules <--> BullMQ
-    Modules --> S3
-    
-    Modules --> Razorpay
-    Modules --> Cashfree
-    Modules --> FCM
-    Modules --> SMS
+    %% Routing
+    CustomerApp <-->|HTTPS/WSS| FastifyAPI
+    WorkerApp <-->|HTTPS/WSS| FastifyAPI
+    AdminWeb <-->|HTTPS| FastifyAPI
+
+    FastifyAPI <-->|Prisma TCP| Postgres
+    FastifyAPI <-->|TCP| Redis
+    FastifyAPI -- "Enqueue Jobs" --> BullMQWorker
+    BullMQWorker <--> Postgres
+    BullMQWorker <--> Redis
+
+    FastifyAPI -->|Upload Docs| S3
+    FastifyAPI -->|Collect Funds| Razorpay
+    BullMQWorker -->|Disburse Funds| Cashfree
+    FastifyAPI -->|Notify| FCM
+    FastifyAPI -->|Send OTP| SMS
 ```
 
 ---
 
-## 🗄️ 4. Core Database Structure (ER Diagram)
+## 🗄️ Database Schema (ER Diagram)
 
-The database schema is highly normalized and partitioned by domains: **Identity, Geography, Catalog, Operations, and Finance**. Below is a simplified Entity-Relationship mapping of the core business models.
+The database is heavily normalized to ensure data integrity across complex financial and operational boundaries.
 
 ```mermaid
 erDiagram
-    %% Geography
-    CITY ||--o{ AREA : contains
-    AREA ||--o{ WORKER : "operates in"
-    
-    %% Identity
+    %% Core Entities
     USER {
-        string id PK
-        string mobile
-        string status
-        int walletBalance
+        String id PK
+        String mobile UK
+        String status
+        Int walletBalance
     }
     
     WORKER {
-        string id PK
-        string mobile
-        string status
-        string tier
-        int walletBalance
+        String id PK
+        String status "PENDING, VERIFIED, ONLINE"
+        String tier
+        Int walletBalance
+        String aadhaarNumber
     }
 
-    %% Catalog
-    SERVICE_CATEGORY ||--o{ SERVICE : contains
-    SERVICE ||--o{ BOOKING : "booked for"
+    CITY {
+        String id PK
+        String name
+        Json surgeConfig
+    }
+    
+    SERVICE {
+        String id PK
+        String name
+        Int basePrice
+    }
 
-    %% Operations
     BOOKING {
-        string id PK
-        string status "PENDING, ASSIGNED, COMPLETED..."
-        int finalAmount
-        string type "INSTANT or SCHEDULED"
+        String id PK
+        String status
+        String type "INSTANT / SCHEDULED"
+        Int baseAmount
+        Int finalAmount
+        Int commissionAmount
+        DateTime scheduledFor
     }
 
-    USER ||--o{ BOOKING : makes
-    WORKER ||--o{ BOOKING : fulfills
-    
-    %% Finance
     PAYMENT {
-        string id PK
-        string status
-        int amount
+        String id PK
+        String status "CAPTURED, FAILED"
+        Int amount
+        String razorpayOrderId
     }
-    BOOKING ||--|| PAYMENT : has
-    
+
     WORKER_EARNING {
-        string id PK
-        int grossAmount
-        int commission
-        int netAmount
+        String id PK
+        Int grossAmount
+        Int commission
+        Int uniformDeduction
+        Int netAmount
     }
-    WORKER ||--o{ WORKER_EARNING : earns
-    BOOKING ||--|| WORKER_EARNING : generates
 
     WORKER_PAYOUT {
-        string id PK
-        int amount
-        string status
+        String id PK
+        Int amount
+        String status "PROCESSING, COMPLETED"
+        String utrNumber
     }
-    WORKER ||--o{ WORKER_PAYOUT : receives
+
+    %% Relationships
+    CITY ||--o{ WORKER : "operates in"
+    CITY ||--o{ BOOKING : "location"
+    
+    USER ||--o{ BOOKING : "requests"
+    WORKER ||--o{ BOOKING : "fulfills"
+    SERVICE ||--o{ BOOKING : "is requested"
+    
+    BOOKING ||--|| PAYMENT : "secured by"
+    BOOKING ||--|| WORKER_EARNING : "generates"
+    
+    WORKER ||--o{ WORKER_EARNING : "accumulates"
+    WORKER ||--o{ WORKER_PAYOUT : "receives"
 ```
 
 ---
 
-## 🔄 5. Key System Flows
+## 🔄 Core Business Flows
 
-### A. The Booking Lifecycle Dataflow
-This flow describes the core operation of the platform: how a user books a service and how a worker fulfills it.
+### A. Booking & Fulfillment Lifecycle
+A highly resilient state machine tracks every gig from search to completion.
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant System as Fastify API
-    participant Redis
-    participant Worker
+    autonumber
+    participant U as Customer
+    participant API as Inistnt API
+    participant R as Redis (Geo)
+    participant W as Worker
+
+    U->>API: 1. Request Service (lat, lng, serviceId)
+    API->>API: 2. Calculate Pricing (Base + Surge)
+    API->>R: 3. GEORADIUS Search (Find Active Workers)
+    R-->>API: 4. Return Candidate Workers
+    API->>W: 5. Broadcast Job via FCM (Push)
+    W->>API: 6. Accept Job Request
+    API->>U: 7. Confirm Booking (Share Worker ETA)
     
-    User->>System: 1. Request Service (Instant/Scheduled)
-    System->>System: 2. Calculate Pricing & Surge
-    System->>Redis: 3. Search for nearby active Workers
-    Redis-->>System: Returns candidate Workers
-    System->>Worker: 4. Send Push Notification (FCM)
-    Worker->>System: 5. Accept Job
-    System->>User: 6. Job Assigned (Worker Details sent)
-    Worker->>System: 7. Mark 'On The Way' -> 'Arrived'
-    System->>User: 8. Trigger OTP to User
-    User->>Worker: 9. Shares OTP
-    Worker->>System: 10. Verify OTP (Work Started)
-    Worker->>System: 11. Work Completed
-    System->>User: 12. Request Payment
-    User->>System: 13. Payment Processed (Razorpay)
-    System->>System: 14. Split Earnings & Commission
-    System->>Worker: 15. Credit Net Amount to Wallet
+    Note over U, W: --- Fulfillment Phase ---
+    W->>API: 8. Mark 'On The Way'
+    W->>API: 9. Mark 'Arrived'
+    API->>U: 10. Generate & Send OTP
+    U->>W: 11. Share OTP offline
+    W->>API: 12. Submit OTP to Start Work
+    W->>API: 13. Mark Work 'Completed'
+    
+    Note over U, W: --- Settlement Phase ---
+    API->>U: 14. Trigger Payment Request
+    U->>API: 15. Pay via Razorpay (CAPTURED)
+    API->>API: 16. Split Funds (Commission vs Earning)
+    API->>W: 17. Credit Worker Wallet
 ```
 
-### B. Worker Finance & TDS Payout Flow
-This flow details how worker earnings are accumulated, how TDS (Tax Deducted at Source) is calculated for compliance, and how payouts are disbursed.
+### B. Financial Engine & TDS Payouts
+Ensuring strict tax compliance and automated fund disbursement.
 
 ```mermaid
 sequenceDiagram
-    participant Worker
-    participant System as Finance Module
+    autonumber
+    participant W as Worker Wallet
+    participant F as Finance Module
     participant DB as PostgreSQL
-    participant Gateway as Cashfree (Payouts)
+    participant C as Cashfree API
 
-    System->>DB: 1. Aggregate Worker Earnings (Wallet)
-    DB-->>System: Total Pending Balance
-    System->>System: 2. Check TDS Threshold (> ₹30,000 annually)
+    F->>DB: 1. Fetch Approved Earnings for Worker
+    DB-->>F: Pending Balance Data
+    F->>F: 2. Calculate Annual Payout Aggregate
     
-    alt TDS Applicable
-        System->>System: 3a. Deduct 1% TDS from Payout
-        System->>DB: 3b. Create TDS Record
-    else No TDS
-        System->>System: 3c. Proceed with full amount
+    alt Aggregate > ₹30,000 (Section 194C)
+        F->>F: 3a. Deduct 1% TDS
+        F->>DB: 3b. Log TDS Record against PAN
+    else Below Threshold
+        F->>F: 3c. Calculate 0% TDS
     end
     
-    System->>Gateway: 4. Initiate Bank/UPI Transfer
-    Gateway-->>System: 5. Transfer Pending
-    System->>DB: 6. Update Payout Status (PROCESSING)
-    Gateway-->>System: 7. Webhook: Transfer SUCCESS
-    System->>DB: 8. Mark Payout COMPLETED, Deduct Wallet Balance
-    System->>Worker: 9. Notify Worker of Payout
+    F->>DB: 4. Deduct Active Loan EMIs / Uniform Fees
+    F->>DB: 5. Create WORKER_PAYOUT (Status: PROCESSING)
+    F->>C: 6. Trigger Bank/UPI Transfer via Cashfree API
+    
+    C-->>F: 7. Acknowledge Transfer Initiated
+    Note over F, C: Webhook Wait Period
+    C->>F: 8. Webhook: Transfer SUCCESS (UTR Generated)
+    F->>DB: 9. Update Payout Status -> COMPLETED
+    F->>W: 10. Debit Worker Wallet Balance
 ```
 
 ---
 
-## 🧩 6. Backend Modules Breakdown
+## 🛠️ Tech Stack Details
 
-The `services/api/src/modules/` directory contains isolated domains representing the platform's features:
-
-1. **`auth/`**: OTP-based login, JWT generation, session management, and RBAC (Role-Based Access Control) for Staff.
-2. **`bookings/`**: The core state machine handling the transition of a job from `PENDING` to `COMPLETED`.
-3. **`payments/` & `payout/`**: Razorpay integrations for collecting customer funds, and Cashfree integrations for disbursing funds to workers. Handles wallet balances, commissions, and refunds.
-4. **`workers/`**: Worker lifecycle management including onboarding, document verification (Aadhaar/PAN), TDS calculation, skills mapping, and uniform checks.
-5. **`tracking/`**: Live geolocation tracking using Redis to match users with nearby gig workers based on polygons and radius calculations.
-6. **`admin/` & `superadmin/`**: CMS capabilities for feature flags, banners, commission rule configurations, and surge pricing modifications.
-7. **`geography/`**: Hierarchical management of States -> Cities -> Areas -> Surge Zones.
-8. **`reviews/` & `support/`**: Customer feedback loops, SOS incidents, dispute handling, and chat features.
-9. **`coupons/` & `referral/`**: Growth mechanics managing discounts, wallet cashbacks, and referral tree bonuses.
+| Domain | Technology | Purpose |
+| :--- | :--- | :--- |
+| **API Server** | Node.js + Fastify | High-throughput, low-latency REST & WebSocket server. |
+| **Database ORM** | Prisma | Strongly typed database client and schema migrations. |
+| **Primary DB** | PostgreSQL 16 | Relational data, ACID transactions, and robust constraints. |
+| **Caching/State** | Redis (ioredis) | Session management, rate limiting, and fast Geo-spatial queries. |
+| **Background Jobs** | BullMQ | Asynchronous tasks (webhook processing, bulk notifications). |
+| **Monorepo Tools** | Turborepo, pnpm | Fast builds, dependency linking, and caching. |
+| **Mobile Apps** | React Native + Expo | Cross-platform (iOS/Android) unified UI development. |
+| **Web Apps** | React + Next.js | SEO-friendly consumer web and fast CMS dashboards. |
 
 ---
 
-## 🔒 7. Compliance & Security (Important Features)
+## 🚀 Local Development
 
-- **Worker Verification:** Mandatory Aadhaar, PAN, and Police Verification document tracking before activation.
-- **TDS Compliance (Section 194C):** Automatic 1% tax deduction tracking for workers whose annual aggregate payout exceeds ₹30,000.
-- **Fraud Detection:** Automated flagging for location spoofing, rapid cancellations, fake selfies, and review manipulation.
-- **Data Encryption:** Sensitive banking details (Account No, IFSC) and identity strings are securely encrypted at rest.
-- **SOS Incident Management:** Immediate escalation queues for emergencies reported by users or workers during an active gig.
+Follow these steps to get the platform running on your local machine.
+
+### Prerequisites
+- Node.js (v20+)
+- pnpm (v8+)
+- Docker & Docker Compose (for Postgres and Redis)
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/inistnt/inistnt.git
+   cd inistnt
+   ```
+
+2. **Install Dependencies (from workspace root):**
+   ```bash
+   pnpm install
+   ```
+
+3. **Start Infrastructure (Databases):**
+   ```bash
+   # Starts PostgreSQL and Redis containers
+   docker-compose up -d
+   ```
+
+4. **Environment Variables:**
+   ```bash
+   # Copy the example environments
+   cp services/api/env.example services/api/.env
+   # Ensure DATABASE_URL and REDIS_URL point to your local docker containers
+   ```
+
+5. **Database Setup:**
+   ```bash
+   cd services/api
+   pnpm run db:generate
+   pnpm run db:migrate
+   pnpm run db:seed  # Optional: Loads dummy catalog & users
+   ```
+
+6. **Start the Development Servers:**
+   ```bash
+   # Go back to root and start Turborepo
+   cd ../../
+   pnpm dev
+   ```
+   *This command will spin up the Fastify API, Admin Web, and Mobile bundlers simultaneously.*
+
+---
+
+<div align="center">
+  <p>Built with ❤️ by the <strong>Inistnt Engineering Team</strong>.</p>
+</div>
